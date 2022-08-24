@@ -636,6 +636,34 @@ def check_duplicate_id(table, ID, connection):
 
     return isDuplicate
 
+
+def store_read_data(dataframe, csv_path=''):
+    '''
+    After the user has read data from the database (from the user interface), this function will allow the user to use the data
+    by outputting it as a Python dictionary object.
+    
+    Depending on the scope of the data (site, table, column), there will be nested dictionaries. A column dictionary will hold a
+    single key/value pair, where the key is the column name, and the dictionary value will be a list of all the values in that
+    column in the database. A table dictionary will have a key/value pair for each column in the table. Each dictionary value will
+    again be a list of vlaues for the column from the database. For a site dictionary, there will be nested dictionaries. Each key
+    in the highest layer dictionary will be a table name; the corresponding value will be a dictionary itself for the table and will
+    format for a table dictionary described previously. 
+    
+    Optionally this function will also allow the dataframe to be stored in a csv. The user will specify a folder (filepath) where
+    they would like the csv(s) to be stored. If the read data is a single column, there will be a single csv file for that column.
+    If the read data is a table, there will be a single csv file for that table. If the read data is a site, there will be one csv
+    per non-empty table for the site.
+    Inputs:
+        dataframe (Pandas dataframe object) - The read data from the database in the form of a Python Pandas dataframe object
+        csv_path (string) - optional input specified by the user for where they'd like to store csvs of the data read from
+                                 the database.
+    Outputs:
+        data_dict (dictionary) - Python dictionary object of the read data
+    '''
+    print(dataframe)
+    print(csv_path)
+    
+
               
 ##### CLASSES #####
 class MismatchIDError(Exception):
