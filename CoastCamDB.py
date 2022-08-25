@@ -310,6 +310,32 @@ if __name__ == "__main__":
                             for row in result.get(column_name):
                                 print(row)
 
+                            print("\nStore read data in a csv?")
+                            isYesNo = False
+                            while not isYesNo:
+
+                                keepReading = input("~~~Enter 'yes' or 'no': ")
+
+                                if keepReading.strip() == 'quit':
+                                    runLoop = False
+                                    quit()
+
+                                if keepReading.strip() == 'yes':
+                                    isYesNo = True
+                                    storeCSV = True
+                                elif keepReading.strip() == 'no':
+                                    isYesNo = True
+                                    storeCSV = False
+                                else:
+                                    print("Invalid choice. Please enter 'yes' or 'no'")
+                                    
+                            if storeCSV:
+                                print("Please enter the filepath to the folder where you'd like to store the csv: ")
+                                csv_path = input("~~~Enter a filepath: ")
+                                data_dict = store_read_data(result, 'column', csv_path=csv_path, table=table_name)
+                            else:
+                                data_dict = store_read_data(result, 'column')
+                            
                             print("\nRead data for another column?")
 
                             isYesNo = False
@@ -336,253 +362,9 @@ if __name__ == "__main__":
 
             ### ADD ###
             elif user_choice.strip() == 'add':
+                pass
 
-                isGoodAnswer = True
-
-                print("Add to the database. Choose to add a 'site', 'table', 'column'.\n")
-
-                isValidChoice = False
-                while not isValidChoice:
-
-                    read_choice = input("~~~Enter 'site', 'table', or 'column': ")
-                    if read_choice.strip() == 'quit':
-                        runLoop = False
-                        quit()
-
-                    elif read_choice.strip() == 'site':
-
-                        isValidChoice = True
-
-                        print("\nWe'll now start adding a site to the database. Start by entering a site name.")
-
-                        siteName = input("~~~Enter a site name: ")
-
-                        if siteName.strip() == 'quit':
-                                runLoop = False
-                                quit()
-
-                        #create site object
-                        newSite = Site(siteName, 'coastcamdb', connection)
-                        newSite.site = Table('site', 'coastcamdb', site=newSite, connection=connection)
-                        newSite.site.name = Column('name', value=siteName, table=newSite.site)
-
-                        print("\nNow enter a siteID for this site. It should be between 1 and 7 characters.")
-
-                        isGoodSite = False
-                        while not isGoodSite:
-
-                            siteID = input("~~~Enter a site id: ")
-
-                            if siteID.strip() == 'quit':
-                                runLoop = False
-                                quit()
-                                
-                            if (len(siteID) < 1) or (len(siteID) > 7):
-                                print('Invalid site id. Site id must be between 1 and 7 characters.\n')
-                            elif check_duplicate_id('site', siteID, connection):
-                                print("id '{}' already exists in the 'site' table. Please try again.".format(siteID))
-                            else:
-                                isGoodSite = True
-                                newSite.site.id = idColumn(table=newSite.site, value=siteID)
-
-                        print(newSite.site.showFields())
-
-                        
-                       
-
-##                        print("\nNow displaying tables associated with site id '{}'".format(siteID))
-##                        displaySite(siteID, connection)
-##
-##                        print("\nRead data for another site?")
-##
-##                        isYesNo = False
-##                        while not isYesNo:
-##
-##                            keepReading = input("~~~Enter 'yes' or 'no': ")
-##
-##                            if keepReading.strip() == 'quit':
-##                                runLoop = False
-##                                quit()
-##
-##                            if keepReading.strip() == 'yes':
-##                                isYesNo = True
-##                                doRead = True
-##                            elif keepReading.strip() == 'no':
-##                                isYesNo = True
-##                                doRead = False
-##                            else:
-##                                print("Invalid choice. Please enter 'yes' or 'no'")
-
-                        ####add in option to add another site
-                        ####add in 'next' option to skip that table for now
-
-                    elif read_choice.strip() == 'table':
-
-                        isValidChoice = True
-
-                        validTables = ['site', 'station', 'gcp', 'camera', 'cameramodel', 'lensmodel' , 'ip', 'geometry', 'usedgcp']
-                        fk_column_list = ['siteID', 'stationID', 'modelID', 'lensmodelID', 'li_IP', 'cameraID', 'siteID', 'gcpID', 'geometrySequence']
-                        
-                        print("\nSelect data for a table from the database by entering a table name")
-                        print("Below are the available tables to display:")
-                        for table in validTables:
-                            print(table)
-
-                        isGoodTable = False
-                        while not isGoodTable:
-
-                            table_name = input("\n~~~Enter a table name: ")
-                            if table_name.strip() == 'quit':
-                                runLoop = False
-                                quit()
-                            
-                            if table_name.strip() in validTables:
-                                isGoodTable = True
-                            else:
-                                print('Invalid table name, please try again.')
-
-                        ###FOR COLUMNS IN TABLE ADD VALUE TO QUEUES FOR COLUMN (OR SKIP)
-                         #create temp Table object to hold Column objects
-                        table = Table(table_name, 'coastcamdb', connection)
-
-                        query = "SELECT * FROM {}".format(table_name)
-                        result = pd.read_sql(query, con=connection)
-                        validColumns = []
-                        for col in result.columns:
-                            if col != 'seq':
-                                validColumns.append(col)
-
-                        print("Below are the columns in the {} table:".format(table_name))
-                        for column in validColumns:
-                            if column in fk_column_list:
-                                print(column, "[FOREIGN KEY]")
-                            else:
-                                print(column)
-
-                        print("\nWe'll now step through each column in the table to insert a new value.")
-                        print("At any time, you can enter 'skip' to skip the current column. This can not be done for foreign key columns.\n")
-
-                        for column in validColumns:
-                            print("Current column: {}".format(column))
-                            
-                            #this uses the Table object's attribute dictionary to add a Column object directly as a Table attribute
-                            if column in fk_column_list:
-                                print("^ Foreign key column, not skippable. ^")
-                                table.__dict__[column] = fkColumn(column, table=table)
-                            elif column == 'id':
-                                table.__dict__[column] = idColumn(table=table)
-                            else:
-                                table.__dict__[column] = Column(column, table=table)
-                        
-                        
-                    elif read_choice.strip() == 'column':
-
-                        isValidChoice = True
-
-                        print("\nSelect a column from the database to insert data into by entering a table name and column name")
-                        print("\nLet's get a table name")
-                        validTables = ['site', 'station', 'gcp', 'camera', 'cameramodel', 'lensmodel' , 'ip', 'geometry', 'usedgcp']
-                        print("Below are the available tables:")
-                        for table in validTables:
-                            print(table)
-                
-                        isGoodTable = False
-                        while not isGoodTable:
-
-                            table_name = input("\n~~~Enter a table name: ")
-                            if table_name.strip() == 'quit':
-                                runLoop = False
-                                quit()
-                            
-                            if table_name.strip() in validTables:
-                                isGoodTable = True
-                            else:
-                                print('Invalid table name, please try again.')
-
-                        #create temp Table object to hold Column object
-                        table = Table(table_name, 'coastcamdb', connection)
-
-                        query = "SELECT * FROM {}".format(table_name)
-                        result = pd.read_sql(query, con=connection)
-                        validColumns = []
-                        for col in result.columns:
-                            validColumns.append(col)
-
-                        print("\nLet's get the column you'd like to insert data into")
-                        print("Below are the available columns:")
-                        for column in validColumns:
-                            print(column)
-
-                        isGoodColumn = False
-                        while not isGoodColumn:
-
-                            column_name = input("\n~~~Enter a column name: ")
-                            if column_name.strip() == 'quit':
-                                runLoop = False
-                                quit()
-                            
-                            if column_name.strip() in validColumns:
-                                isGoodColumn = True
-                            else:
-                                print('Invalid column name, please try again.')
-
-                        fk_column_list = ['siteID', 'stationID', 'modelID', 'lensmodelID', 'li_IP', 'cameraID', 'siteID', 'gcpID', 'geometrySequence']
-
-                        #create Column object
-                        id_list = []
-                        seq_list = []
-                        fk_args = {}
-                        if column_name in fk_column_list:
-                            table.newColumn = fkColumn(column_name, table=table)
-
-                            print("You've chosen a foreign key column. Please ener a valid value from the linked table.")
-                            table.newColumn.display_linked_key()
-                            
-                        elif column_name == 'id':
-                            table.newColumn = idColumn(table=table)
-
-                            #tables besides site, lensmodel, cameramodel, and ip need foreign keys
-                            if (table_name != 'site') and (table_name != 'lensmodel') and (table_name != 'cameramodel') and (table_name != 'ip'):
-                                print("\nThis column requires a key value to specify the row of the table to update.")
-                                fk_args = table.newColumn.get_fk_args()
-                            else:
-                                fk_args = []
-
-                        else:
-                            table.newColumn = Column(column_name, table)
-
-                            #some tables require foreign key to insert new value
-                            if (table_name != 'site') and (table_name != 'ip') and (table_name != 'lensmodel') and (table_name != 'cmaeramodel'):
-                                print('\nBefore adding a value to this column, a key value must be specified')
-                                fk_args = table.newColumn.get_fk_args()
-                            else:
-                                fk_args = []
-
-
-                        print("\nNow let's add data to this column.")
-
-                        isGoodValue = False
-                        while not isGoodValue:
-
-                            column_value = input("~~~Enter new value to insert into column: ")
-
-                            if column_value.strip() == 'quit':
-                                runLoop = False
-                                quit()
-
-                            try:
-                                table.newColumn.add2queue(column_value)
-
-                                table.newColumn.insert2db(fk_args=fk_args)
-
-                                isGoodValue = True
-                            except:
-                                print("Invalid data value. Please try again.")
-
-                    else:
-                        print("Invalid choice. Please enter 'site', 'table', or 'column'")
-
-                    ######option to add another column
+                ############need to use csv
 
 
             ### UPDATE ###
