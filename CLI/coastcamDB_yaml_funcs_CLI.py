@@ -1,5 +1,5 @@
 ##### IMPORTS #####
-from coastcamDBfuncs import *
+from coastcamDBfuncs_CLI import *
 import mysql.connector
 
 ##### FUNCTIONS #####
