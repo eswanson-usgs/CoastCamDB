@@ -310,22 +310,32 @@ def get_formatted_result(query, connection):
 def displaySite(siteID, connection):
     '''
     Display all the columns for a site given a site id. Use the site id to get 'cascading' foreign keys for every table below
-    'site' in the coastcamdb hierarchy.
+    'site' in the coastcamdb hierarchy.Returns a list of tuples where the first element of the tuple is the table name and the
+    second element is the table dataframe.
     Inputs:
         siteID (string) - id for site in the 'site' table
         connection (pymysql.connections.Connection object) - object representing the connection to the DB
+        df_list (list) - list of tuples where the first element of the tuple is the table name and the
+                         second element is the table dataframe.
     outputs:
-        none
+        df_list (list) - list of Pandas dataframe obuects, one for each table corresponding to the site.
     '''
 
     pd.set_option('display.width' ,160)
     pd.set_option('display.max_columns', 40)
+
+    df_list = []
 
     #site
     query = "SELECT * FROM site WHERE id = '{}'".format(siteID)
     result = get_formatted_result(query, connection)
     print('---SITE---')
     print(result)
+
+    #don't add empty tables to the dataframe list
+    if not result.empty:
+        df_tuple = ('site', result)
+        df_list.append(df_tuple)
 
     #station
     query = "SELECT * FROM station WHERE siteID = '{}'".format(siteID)
@@ -336,6 +346,10 @@ def displaySite(siteID, connection):
             raise Exception
         print('\n---STATION---')
         print(result)
+
+        if not result.empty:
+            df_tuple = ('station', result)
+            df_list.append(df_tuple)
     except:
         pass
 
@@ -358,6 +372,10 @@ def displaySite(siteID, connection):
         result.index = blankIndex
         print('\n---CAMERA---')
         print(result)
+
+        if not result.empty:
+            df_tuple = ('camera', result)
+            df_list.append(df_tuple)
     except:
         pass
 
@@ -375,6 +393,10 @@ def displaySite(siteID, connection):
             result = cameramodel_result[0]
         print('\n---CAMERAMODEL---')
         print(result)
+
+        if not result.empty:
+            df_tuple = ('cameramodel', result)
+            df_list.append(df_tuple)
     except:
         pass
 
@@ -391,6 +413,10 @@ def displaySite(siteID, connection):
             result = lensmodel_result[0]
         print('\n---LENSMODEL---')
         print(result)
+
+        if not result.empty:
+            df_tuple = ('lensmodel', result)
+            df_list.append(df_tuple)
     except:
         pass
 
@@ -407,6 +433,10 @@ def displaySite(siteID, connection):
             result = li_IP_result[0]
         print('\n---IP---')
         print(result)
+
+        if not result.empty:
+            df_tuple = ('ip', result)
+            df_list.append(df_tuple)
     except:
         pass
     
@@ -419,6 +449,10 @@ def displaySite(siteID, connection):
             raise Exception
         print('\n---GCP---')
         print(result)
+
+        if not result.empty:
+            df_tuple = ('gcp', result)
+            df_list.append(df_tuple)
     except:
         pass
 
@@ -436,6 +470,10 @@ def displaySite(siteID, connection):
         geometrySequence = result.get('seq')
         print('\n---GEOMETRY---')
         print(result)
+
+        if not result.empty:
+            df_tuple = ('geometry', result)
+            df_list.append(df_tuple)
     except:
         pass
 
@@ -453,8 +491,14 @@ def displaySite(siteID, connection):
             result = usedgcp_result[0]
         print('\n---USEDGCP---')
         print(result)
+
+        if not result.empty:
+            df_tuple = ('usedgcp', result)
+            df_list.append(df_tuple)
     except:
         pass
+
+    return df_list
 
 def getParameterDicts(stationID, connection):
     '''
@@ -637,7 +681,7 @@ def check_duplicate_id(table, ID, connection):
     return isDuplicate
 
 
-def store_read_data(dataframe, scope, csv_path='', table=''):
+def store_read_data(dataframe, scope, table, csv_path='', data_dict = {}):
     '''
     After the user has read data from the database (from the user interface), this function will allow the user to use the data
     by outputting it as a Python dictionary object.
@@ -647,24 +691,23 @@ def store_read_data(dataframe, scope, csv_path='', table=''):
     column in the database. A table dictionary will have a key/value pair for each column in the table. Each dictionary value will
     again be a list of vlaues for the column from the database. For a site dictionary, there will be nested dictionaries. Each key
     in the highest layer dictionary will be a table name; the corresponding value will be a dictionary itself for the table and will
-    format for a table dictionary described previously. 
+    format for a table dictionary described previously. However, the user will have to pass in an existing data_dict object to
+    "append" the nested dictionaries to.
     
     Optionally this function will also allow the dataframe to be stored in a csv. The user will specify a folder (filepath) where
     they would like the csv(s) to be stored. If the read data is a single column, there will be a single csv file for that column.
     If the read data is a table, there will be a single csv file for that table. If the read data is a site, there will be one csv
     per non-empty table for the site.
     Inputs:
-        dataframe (Pandas dataframe object) - The read data from the database in the form of a Python Pandas dataframe object
+        dataframe (Pandas dataframe object) - The read data from the database in the form of a Python 
         csv_path (string) - optional input specified by the user for where they'd like to store csvs of the data read from
                                  the database.
         scope (string) - defines the scope of the data being read: 'site' ,'table', or 'column'
-        table (string) - input needed when writing column to csv to specify which table the column is in. Not every column
-                         name in the database is unique.
+        table (string) - input needed when writing  to csv because nott every column name in the database is unique.
     Outputs:
         data_dict (dictionary) - Python dictionary object of the read data
     '''
 
-    data_dict = {}
     csv_path = csv_path.replace('\\', '/')
     
     if scope == 'column':
@@ -686,12 +729,55 @@ def store_read_data(dataframe, scope, csv_path='', table=''):
                 
             full_path = folder_path + filename
             dataframe.to_csv(full_path, encoding='utf-8', index=False)
+
+            print("Saved csv file to", full_path)
     
     elif scope == 'table':
-        pass
+        column_list = dataframe.columns
+        
+        for column in column_list:
+            column_values = []
+            
+            for value in dataframe.get(column):
+                column_values.append(value)
+
+            data_dict[column] = column_values
+
+        if csv_path != '':
+            filename = table + '.csv'
+            folder_path = csv_path + 'tables/'
+
+            if not os.path.exists(folder_path):
+                os.makedirs(folder_path)
+
+            full_path = folder_path + filename
+            dataframe.to_csv(full_path, encoding='utf-8', index=False)
+
+            print("Saved csv file to", full_path)
     
     elif scope == 'site':
-        pass
+        nested_dict = {}
+        column_list = dataframe.columns
+        
+        for column in column_list:
+            column_values = []
+            
+            for value in dataframe.get(column):
+                column_values.append(value)
+
+            nested_dict[column] = column_values
+        data_dict[table] = nested_dict
+
+        if csv_path != '':
+            site = data_dict['site']['id'][0]
+            filename = table + '.csv'
+            folder_path = csv_path + '/sites/' + site + '/tables/'
+
+            if not os.path.exists(folder_path):
+                os.makedirs(folder_path)
+
+            full_path = folder_path + filename
+            dataframe.to_csv(full_path, encoding='utf-8', index=False)
     
     else:
         print("'scope' argument for store_read_data() must be 'column', 'table', or 'site'")

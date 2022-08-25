@@ -172,7 +172,46 @@ if __name__ == "__main__":
                                     print('Invalid site id, please try again.\n')
 
                             print("\nNow displaying tables associated with site id '{}'".format(siteID))
-                            displaySite(siteID, connection)
+                            #returns list of table dataframes to be used when storing the read data
+                            df_list = displaySite(siteID, connection)
+
+                            print("\nStore read data in a csv?")
+                            isYesNo = False
+                            while not isYesNo:
+
+                                keepReading = input("~~~Enter 'yes' or 'no': ")
+
+                                if keepReading.strip() == 'quit':
+                                    runLoop = False
+                                    quit()
+
+                                if keepReading.strip() == 'yes':
+                                    isYesNo = True
+                                    storeCSV = True
+                                elif keepReading.strip() == 'no':
+                                    isYesNo = True
+                                    storeCSV = False
+                                else:
+                                    print("Invalid choice. Please enter 'yes' or 'no'")
+                                    
+                            if storeCSV:
+                                print("\nPlease enter the filepath to the folder where you'd like to store the csv: ")
+                                csv_path = input("~~~Enter a filepath: ")
+
+                                data_dict = {}
+                                for df_tuple in df_list:
+                                    table = df_tuple[0]
+                                    df = df_tuple[1]
+                                    data_dict = store_read_data(df, 'site', table=table, csv_path=csv_path, data_dict=data_dict)
+
+                                site_path = csv_path + 'sites\' + siteID
+                                print("Saved csv to", site_path)
+                            else:
+                                data_dict = {}
+                                for df_tuple in df_list:
+                                    table = df_tuple[0]
+                                    df = df_tuple[1]
+                                    data_dict = store_read_data(df, 'site', table=table, data_dict=data_dict)
 
                             print("\nRead data for another site?")
 
@@ -231,6 +270,32 @@ if __name__ == "__main__":
                             blankIndex = [''] * len(result)
                             result.index = blankIndex
                             print(result)
+
+                            print("\nStore read data in a csv?")
+                            isYesNo = False
+                            while not isYesNo:
+
+                                keepReading = input("~~~Enter 'yes' or 'no': ")
+
+                                if keepReading.strip() == 'quit':
+                                    runLoop = False
+                                    quit()
+
+                                if keepReading.strip() == 'yes':
+                                    isYesNo = True
+                                    storeCSV = True
+                                elif keepReading.strip() == 'no':
+                                    isYesNo = True
+                                    storeCSV = False
+                                else:
+                                    print("Invalid choice. Please enter 'yes' or 'no'")
+                                    
+                            if storeCSV:
+                                print("\nPlease enter the filepath to the folder where you'd like to store the csv: ")
+                                csv_path = input("~~~Enter a filepath: ")
+                                data_dict = store_read_data(result, 'table', csv_path=csv_path, table=table_name)
+                            else:
+                                data_dict = store_read_data(result, 'table', table=table_name)
 
                             print("\nRead data for another table?")
 
@@ -330,7 +395,7 @@ if __name__ == "__main__":
                                     print("Invalid choice. Please enter 'yes' or 'no'")
                                     
                             if storeCSV:
-                                print("Please enter the filepath to the folder where you'd like to store the csv: ")
+                                print("\nPlease enter the filepath to the folder where you'd like to store the csv: ")
                                 csv_path = input("~~~Enter a filepath: ")
                                 data_dict = store_read_data(result, 'column', csv_path=csv_path, table=table_name)
                             else:
@@ -355,7 +420,6 @@ if __name__ == "__main__":
                                     doRead = False
                                 else:
                                     print("Invalid choice. Please enter 'yes' or 'no'") 
-
 
                     else:
                         print("Invalid choice. Please enter 'site', 'table', or 'column'")
