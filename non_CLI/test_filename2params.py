@@ -8,7 +8,7 @@ connection = DBConnectCSV("C:/Users/eswanson/OneDrive - DOI/Documents/Python/db_
 
 params = filename2param(filename, connection)
 
-##print(params.extrinsics[0])
-##print(params.intrinsics[0])
-##print(params.metadata[0])
-##print(params.local_origin)
+print(params.extrinsics[0])
+print(params.intrinsics[0])
+print(params.metadata[0])
+print(params.local_origin)

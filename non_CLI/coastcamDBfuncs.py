@@ -525,8 +525,6 @@ def getParameterDicts(stationID, unix_time, connection):
     for ID in result.get('id'):
         camera_list.append(ID)
 
-    print(camera_list)
-
     #lists of dictionaries. One dictionary in every list for each camera.
     metadata_dict_list = []
     extrinsic_dict_list = []
