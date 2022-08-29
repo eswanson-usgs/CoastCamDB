@@ -204,7 +204,7 @@ if __name__ == "__main__":
                                     df = df_tuple[1]
                                     data_dict = store_read_data(df, 'site', table=table, csv_path=csv_path, data_dict=data_dict)
 
-                                site_path = csv_path + 'sites\' + siteID
+                                site_path = csv_path + 'sites\\' + siteID
                                 print("Saved csv to", site_path)
                             else:
                                 data_dict = {}
@@ -426,9 +426,48 @@ if __name__ == "__main__":
 
             ### ADD ###
             elif user_choice.strip() == 'add':
-                pass
 
-                ############need to use csv
+                isGoodAnswer = True
+
+                print("\nInsert new data into the database using a csv file")
+                print("To insert new data, we'll enter a filepath to csv template for the file you'd like to add")
+
+                validTables = ['site', 'station', 'gcp', 'camera', 'cameramodel', 'lensmodel' , 'ip', 'geometry', 'usedgcp']
+                
+                isGoodCSV = False
+                while not isGoodCSV:
+
+                    csv_path = input("~~~Enter a csv filepath (ex: user\\documents\\CoastCamDB\\table_csv\\station.csv): ")
+                    
+                    csv_path = csv_path.replace('\\', '/')
+                    path_elements = csv_path.split('/')
+                    filename = path_elements[-1]
+
+                    if csv_path.strip() == 'quit':
+                        runLoop = False
+                        quit()
+
+                    isGoodTable = False
+                    for table in validTables:
+                        #csv file matches
+                        if filename == (table + '.csv'):
+                            isGoodTable = True
+                            break
+                    
+                    if not csv_path.endswith('csv'):
+                        print("Please try again and enter a filepath to a csv file.")
+                    elif not isGoodTable:
+                        print("Please try again and enter a csv file that has a valid table name as the file name. For example, station.csv.")
+                    elif os.path.exists(csv_path):
+                        #valid file found
+                        isGoodCSV = True
+                    else:
+                        print("Invalid filepath, please try again.")
+
+                #add data in csv to table
+                csv2db(csv_path)
+
+                ######option to add another tabe
 
 
             ### UPDATE ###

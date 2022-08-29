@@ -783,6 +783,18 @@ def store_read_data(dataframe, scope, table, csv_path='', data_dict = {}):
         print("'scope' argument for store_read_data() must be 'column', 'table', or 'site'")
 
     return data_dict
+
+
+def csv2db(csv_path):
+    '''
+    Insert new table data into the database using a csv file. Data will be taken from a csv template.
+    Inputs:
+        csv_path (string) - path to the csv file that will be used to add data.
+    Outputs:
+        none
+    '''
+
+    pass
     
          
 ##### CLASSES #####

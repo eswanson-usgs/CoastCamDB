@@ -1,0 +1,7 @@
+seq,id,stationID,syncsToID,lensSN,cameraSN,filters,orientation,cameraNumber,timeIN,timeOUT,x,y,z,polarizerFlag,K,kc,timestamp,polAngle,modelID,lensmodelID,li_IP
+6,1234567,7654321,none,12345,12345,fisheye,n,1,1654538400,1654607895,1.1,2.2,3.3,0.0,"[[1 2 3], [4 5 6], [7 8 9]]",[1 2 3 4 5],1658517499.0,999.0,XXXXX,XXXXX,XXXXX
+9,example,7654321,none,12345,54321,fisheye,n,2,1654538400,1654607895,1.1,2.2,3.3,0.0,"[[1 2 3], [4 5 6], [7 8 9]]",[1 2 3 4 5],1658763812.0,999.0,XXXXX,XXXXX,XXXXX
+14,noblank,7654321,,,,,,0,0,0,,,,,,,,,,,
+15,xxxxx,7654321,,,,,,7,0,0,,,,,,,,,,,
+10,fffff,elpmaxx,,,54321,,,2,1654538400,0,,,,,,,,,XXXXX,XXXXX,XXXXX
+19,,xtestx,,,,,,0,0,0,,,,,,,,,,,

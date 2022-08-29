@@ -1,0 +1,2 @@
+seq,id,name,siteID,timeIN,timeOUT,x,y,z,timestamp
+32,YXXXY,example gcp,7654321,1657652756,1657652756,1.0,2.0,3.0,1657652756
