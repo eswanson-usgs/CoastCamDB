@@ -808,9 +808,7 @@ def column2csv(column, table, csv_path, connection):
     '''
 
     query = "SELECT {} FROM {}".format(column, table)
-    result = pd.read_sql(query, con=connection)
-    blankIndex = [''] * len(result)
-    result.index = blankIndex
+    result = get_formatted_result(query, connection)
 
     filename = table + '_' + column + '.csv'
     folder_path = csv_path + 'columns/'
@@ -840,9 +838,7 @@ def table2csv(table, csv_path, connection):
     '''
 
     query = "SELECT * FROM {}".format(table)
-    result = pd.read_sql(query, con=connection)
-    blankIndex = [''] * len(result)
-    result.index = blankIndex
+    result = get_formatted_result(query, connection)
 
     filename = table + '.csv'
     folder_path = csv_path + 'tables/'
@@ -858,6 +854,199 @@ def table2csv(table, csv_path, connection):
     
     return result
 
+
+def site2csv(siteID, csv_path, connection):
+    '''
+    Store a data read from a site in the database into a csv file using a specific siteID. There will be a folder for the site
+    where there's one csv file per table.
+    Inputs:
+        csv_path (string) - optional input specified by the user for where they'd like to store csvs of the data read from
+                                 the database.
+        table (string) - table name
+        connection (pymysql.connections.Connection object) - object representing the connection to the DB
+    Outputs:
+        output_list (list) - list of Pandas datframes, one for each non-empty table associated with the given siteID
+    '''
+
+    df_list = []
+
+    #site
+    query = "SELECT * FROM site WHERE id = '{}'".format(siteID)
+    result = get_formatted_result(query, connection)
+
+    #don't add empty tables to the dataframe list
+    if not result.empty:
+        df_tuple = ('site', result)
+        df_list.append(df_tuple)
+
+    #station
+    query = "SELECT * FROM station WHERE siteID = '{}'".format(siteID)
+    result = get_formatted_result(query, connection)
+    stationID = result.get('id')
+    try:
+        if result.empty:
+            raise Exception
+
+        df_tuple = ('station', result)
+        df_list.append(df_tuple)
+    except:
+        pass
+
+    #camera
+    camera_result = []
+    try:
+        for ID in stationID:
+            query = "SELECT * FROM camera WHERE stationID = '{}'".format(ID)
+            camera_result.append(pd.read_sql(query, con=connection))
+        #account for multiple stations. Concatenate all results into 1 dataframe
+        if len(stationID) > 1:
+            result = pd.concat(camera_result, axis=0)
+        else:
+            result = camera_result[0]
+        cameraID = result.get('id')
+        modelID = result.get('modelID')
+        lensmodelID = result.get('lensmodelID')
+        li_IP = result.get('li_IP')
+        blankIndex = [''] * len(result)
+        result.index = blankIndex
+
+        if not result.empty:
+            df_tuple = ('camera', result)
+            df_list.append(df_tuple)
+    except:
+        pass
+
+    #cameramodel
+    cameramodel_result = []
+    try:
+        for ID in modelID:
+            query = "SELECT * FROM cameramodel WHERE id = '{}'".format(ID)
+            cameramodel_result.append(pd.read_sql(query, con=connection))
+        #account for multiple stations. Concatenate all results into 1 dataframe
+        if len(modelID) > 1:
+            result = pd.concat(cameramodel_result, axis=0)
+            result = result.drop_duplicates(subset='id', keep='first')
+        else:
+            result = cameramodel_result[0]
+
+        if not result.empty:
+            df_tuple = ('cameramodel', result)
+            df_list.append(df_tuple)
+    except:
+        pass
+
+    #lensmodel
+    lensmodel_result = []
+    try:
+        for ID in lensmodelID:
+            query = "SELECT * FROM lensmodel WHERE id = '{}'".format(ID)
+            lensmodel_result.append(pd.read_sql(query, con=connection))
+        if len(lensmodelID) > 1:
+            result = pd.concat(lensmodel_result, axis=0)
+            result = result.drop_duplicates(subset='id', keep='first')
+        else:
+            result = lensmodel_result[0]
+
+        if not result.empty:
+            df_tuple = ('lensmodel', result)
+            df_list.append(df_tuple)
+    except:
+        pass
+
+    #ip
+    li_IP_result = []
+    try:
+        for ID in li_IP:
+            query = "SELECT * FROM ip WHERE id = '{}'".format(ID)
+            li_IP_result.append(pd.read_sql(query, con=connection))
+        if len(li_IP) > 1:
+            result = pd.concat(li_IP_result, axis=0)
+            result = result.drop_duplicates(subset='id', keep='first')
+        else:
+            result = li_IP_result[0]
+
+        if not result.empty:
+            df_tuple = ('ip', result)
+            df_list.append(df_tuple)
+    except:
+        pass
+    
+    #gcp
+    query = "SELECT * FROM gcp WHERE siteID = '{}'".format(siteID)
+    result = get_formatted_result(query, connection)
+    gcpID = result.get('id')
+    try:
+        if result.empty:
+            raise Exception
+
+        if not result.empty:
+            df_tuple = ('gcp', result)
+            df_list.append(df_tuple)
+    except:
+        pass
+
+    #geometry
+    geometry_result = []
+    try:
+        for ID in cameraID:
+            query = "SELECT * FROM geometry WHERE cameraID = '{}'".format(ID)
+            geometry_result.append(pd.read_sql(query, con=connection))
+        if len(cameraID) > 1:
+            result = pd.concat(geometry_result, axis=0)
+            result = result.drop_duplicates(subset='seq', keep='first')
+        else:
+            result = geometry_result[0]
+        geometrySequence = result.get('seq')
+
+        if not result.empty:
+            df_tuple = ('geometry', result)
+            df_list.append(df_tuple)
+    except:
+        pass
+
+    #usedgcp
+    try:
+        usedgcp_result = []
+        for ID in gcpID:
+            for seq in geometrySequence:
+                query = "SELECT * FROM usedgcp WHERE gcpID = '{}' AND geometrySequence = {}".format(ID, seq)
+                usedgcp_result.append(pd.read_sql(query, con=connection))
+        if (len(gcpID) > 1) or (len(geometrySequence) > 1):
+            result = pd.concat(usedgcp_result, axis=0)
+            result = result.drop_duplicates(subset='seq', keep='first')
+        else:
+            result = usedgcp_result[0]
+
+        if not result.empty:
+            df_tuple = ('usedgcp', result)
+            df_list.append(df_tuple)
+    except:
+        pass
+
+    #list of dataframes to output
+    output_list = []
+
+    #add tables to csv files
+    for df_tuple in df_list:
+        table = df_tuple[0]
+        df = df_tuple[1]
+
+        output_list.append(df)
+
+        filename = table + '.csv'
+        folder_path = csv_path + '/sites/' + siteID + '/tables/'
+
+        #if folders for saving csv does not exist, create directory
+        if not os.path.exists(folder_path):
+            os.makedirs(folder_path)
+            
+        full_path = folder_path + filename
+        result.to_csv(full_path, encoding='utf-8', index=False)
+
+    print("Saved csv files to", folder_path)
+
+    return output_list
+        
          
 ##### CLASSES #####
 class MismatchIDError(Exception):
