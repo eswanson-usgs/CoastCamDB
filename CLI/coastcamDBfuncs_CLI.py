@@ -683,18 +683,7 @@ def check_duplicate_id(table, ID, connection):
 
 def store_read_data(dataframe, scope, table, csv_path='', data_dict = {}):
     '''
-    After the user has read data from the database (from the user interface), this function will allow the user to use the data
-    by outputting it as a Python dictionary object.
-    
-    Depending on the scope of the data (site, table, column), there will be nested dictionaries. A column dictionary will hold a
-    single key/value pair, where the key is the column name, and the dictionary value will be a list of all the values in that
-    column in the database. A table dictionary will have a key/value pair for each column in the table. Each dictionary value will
-    again be a list of vlaues for the column from the database. For a site dictionary, there will be nested dictionaries. Each key
-    in the highest layer dictionary will be a table name; the corresponding value will be a dictionary itself for the table and will
-    format for a table dictionary described previously. However, the user will have to pass in an existing data_dict object to
-    "append" the nested dictionaries to.
-    
-    Optionally this function will also allow the dataframe to be stored in a csv. The user will specify a folder (filepath) where
+    This function will also allow a dataframe to be stored in a csv. The user will specify a folder (filepath) where
     they would like the csv(s) to be stored. If the read data is a single column, there will be a single csv file for that column.
     If the read data is a table, there will be a single csv file for that table. If the read data is a site, there will be one csv
     per non-empty table for the site.
@@ -705,7 +694,7 @@ def store_read_data(dataframe, scope, table, csv_path='', data_dict = {}):
         scope (string) - defines the scope of the data being read: 'site' ,'table', or 'column'
         table (string) - input needed when writing  to csv because nott every column name in the database is unique.
     Outputs:
-        data_dict (dictionary) - Python dictionary object of the read data
+        none
     '''
 
     csv_path = csv_path.replace('\\', '/')
@@ -782,7 +771,7 @@ def store_read_data(dataframe, scope, table, csv_path='', data_dict = {}):
     else:
         print("'scope' argument for store_read_data() must be 'column', 'table', or 'site'")
 
-    return data_dict
+    return
     
          
 ##### CLASSES #####
