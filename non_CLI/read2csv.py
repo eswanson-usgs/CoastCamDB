@@ -9,8 +9,8 @@ from coastcamDBfuncs import *
 connection = DBConnectCSV("C:/Users/eswanson/OneDrive - DOI/Documents/Python/db_access.csv")
 
 #define scope of what will be saved to csv
-isColumn = True
-isTable = False
+isColumn = False
+isTable = True
 isSite = False
 
 # vv changeable parameter
@@ -23,4 +23,12 @@ if isColumn:
     table = 'camera'
     column = 'filters'
 
-    column2csv(column, table, csv_path, connection)
+    dataframe = column2csv(column, table, csv_path, connection)
+
+#table
+if isTable:
+
+    # vv changeable parameters vv
+    table = 'camera'
+
+    dataframe = table2csv(table, csv_path, connection)

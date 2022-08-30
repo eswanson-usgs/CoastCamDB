@@ -826,6 +826,38 @@ def column2csv(column, table, csv_path, connection):
     
     return result
 
+
+def table2csv(table, csv_path, connection):
+    '''
+    Store a data read from a table in the database into a csv file. There will be a single file for the table.
+    Inputs:
+        csv_path (string) - optional input specified by the user for where they'd like to store csvs of the data read from
+                                 the database.
+        table (string) - table name
+        connection (pymysql.connections.Connection object) - object representing the connection to the DB
+    Outputs:
+        result (Pandas dataframe) - resultant dataframe containing column data
+    '''
+
+    query = "SELECT * FROM {}".format(table)
+    result = pd.read_sql(query, con=connection)
+    blankIndex = [''] * len(result)
+    result.index = blankIndex
+
+    filename = table + '.csv'
+    folder_path = csv_path + 'tables/'
+
+    #if folders for saving csv does not exist, create directory
+    if not os.path.exists(folder_path):
+        os.makedirs(folder_path)
+        
+    full_path = folder_path + filename
+    result.to_csv(full_path, encoding='utf-8', index=False)
+
+    print("Saved csv file to", full_path)
+    
+    return result
+
          
 ##### CLASSES #####
 class MismatchIDError(Exception):
