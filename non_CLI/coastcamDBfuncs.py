@@ -691,109 +691,141 @@ def check_duplicate_id(table, ID, connection):
     return isDuplicate
 
 
-def store_read_data(dataframe, scope, table, csv_path='', data_dict = {}):
+##def store_read_data(dataframe, scope, table, csv_path='', data_dict = {}):
+##    '''
+##    After the user has read data from the database (from the user interface), this function will allow the user to use the data
+##    by outputting it as a Python dictionary object.
+##    
+##    Depending on the scope of the data (site, table, column), there will be nested dictionaries. A column dictionary will hold a
+##    single key/value pair, where the key is the column name, and the dictionary value will be a list of all the values in that
+##    column in the database. A table dictionary will have a key/value pair for each column in the table. Each dictionary value will
+##    again be a list of vlaues for the column from the database. For a site dictionary, there will be nested dictionaries. Each key
+##    in the highest layer dictionary will be a table name; the corresponding value will be a dictionary itself for the table and will
+##    format for a table dictionary described previously. However, the user will have to pass in an existing data_dict object to
+##    "append" the nested dictionaries to.
+##    
+##    Optionally this function will also allow the dataframe to be stored in a csv. The user will specify a folder (filepath) where
+##    they would like the csv(s) to be stored. If the read data is a single column, there will be a single csv file for that column.
+##    If the read data is a table, there will be a single csv file for that table. If the read data is a site, there will be one csv
+##    per non-empty table for the site.
+##    Inputs:
+##        dataframe (Pandas dataframe object) - The read data from the database in the form of a Python 
+##        csv_path (string) - optional input specified by the user for where they'd like to store csvs of the data read from
+##                                 the database.
+##        scope (string) - defines the scope of the data being read: 'site' ,'table', or 'column'
+##        table (string) - input needed when writing  to csv because nott every column name in the database is unique.
+##    Outputs:
+##        data_dict (dictionary) - Python dictionary object of the read data
+##    '''
+##
+##    csv_path = csv_path.replace('\\', '/')
+##    
+##    if scope == 'column':
+##        column_name = dataframe.columns[0]
+##        column_values = []
+##        
+##        for value in dataframe.get(column_name):
+##            column_values.append(value)
+##
+##        data_dict[column_name] = column_values
+##
+##        if csv_path != '':
+##            filename = table + '_' + column_name + '.csv'
+##            folder_path = csv_path + 'columns/'
+##
+##            #if folders for saving csv does not exist, create directory
+##            if not os.path.exists(folder_path):
+##                os.makedirs(folder_path)
+##                
+##            full_path = folder_path + filename
+##            dataframe.to_csv(full_path, encoding='utf-8', index=False)
+##
+##            print("Saved csv file to", full_path)
+##    
+##    elif scope == 'table':
+##        column_list = dataframe.columns
+##        
+##        for column in column_list:
+##            column_values = []
+##            
+##            for value in dataframe.get(column):
+##                column_values.append(value)
+##
+##            data_dict[column] = column_values
+##
+##        if csv_path != '':
+##            filename = table + '.csv'
+##            folder_path = csv_path + 'tables/'
+##
+##            if not os.path.exists(folder_path):
+##                os.makedirs(folder_path)
+##
+##            full_path = folder_path + filename
+##            dataframe.to_csv(full_path, encoding='utf-8', index=False)
+##
+##            print("Saved csv file to", full_path)
+##    
+##    elif scope == 'site':
+##        nested_dict = {}
+##        column_list = dataframe.columns
+##        
+##        for column in column_list:
+##            column_values = []
+##            
+##            for value in dataframe.get(column):
+##                column_values.append(value)
+##
+##            nested_dict[column] = column_values
+##        data_dict[table] = nested_dict
+##
+##        if csv_path != '':
+##            site = data_dict['site']['id'][0]
+##            filename = table + '.csv'
+##            folder_path = csv_path + '/sites/' + site + '/tables/'
+##
+##            if not os.path.exists(folder_path):
+##                os.makedirs(folder_path)
+##
+##            full_path = folder_path + filename
+##            dataframe.to_csv(full_path, encoding='utf-8', index=False)
+##    
+##    else:
+##        print("'scope' argument for store_read_data() must be 'column', 'table', or 'site'")
+##
+##    return data_dict
+
+def column2csv(column, table, csv_path, connection):
     '''
-    After the user has read data from the database (from the user interface), this function will allow the user to use the data
-    by outputting it as a Python dictionary object.
-    
-    Depending on the scope of the data (site, table, column), there will be nested dictionaries. A column dictionary will hold a
-    single key/value pair, where the key is the column name, and the dictionary value will be a list of all the values in that
-    column in the database. A table dictionary will have a key/value pair for each column in the table. Each dictionary value will
-    again be a list of vlaues for the column from the database. For a site dictionary, there will be nested dictionaries. Each key
-    in the highest layer dictionary will be a table name; the corresponding value will be a dictionary itself for the table and will
-    format for a table dictionary described previously. However, the user will have to pass in an existing data_dict object to
-    "append" the nested dictionaries to.
-    
-    Optionally this function will also allow the dataframe to be stored in a csv. The user will specify a folder (filepath) where
-    they would like the csv(s) to be stored. If the read data is a single column, there will be a single csv file for that column.
-    If the read data is a table, there will be a single csv file for that table. If the read data is a site, there will be one csv
-    per non-empty table for the site.
+    Store a data read from a column in the database into a csv file. There will be a single file for the column.
     Inputs:
-        dataframe (Pandas dataframe object) - The read data from the database in the form of a Python 
+        column (string) - column name
         csv_path (string) - optional input specified by the user for where they'd like to store csvs of the data read from
                                  the database.
-        scope (string) - defines the scope of the data being read: 'site' ,'table', or 'column'
         table (string) - input needed when writing  to csv because nott every column name in the database is unique.
+        connection (pymysql.connections.Connection object) - object representing the connection to the DB
     Outputs:
-        data_dict (dictionary) - Python dictionary object of the read data
+        result (Pandas dataframe) - resultant dataframe containing column data
     '''
 
-    csv_path = csv_path.replace('\\', '/')
-    
-    if scope == 'column':
-        column_name = dataframe.columns[0]
-        column_values = []
+    query = "SELECT {} FROM {}".format(column, table)
+    result = pd.read_sql(query, con=connection)
+    blankIndex = [''] * len(result)
+    result.index = blankIndex
+
+    filename = table + '_' + column + '.csv'
+    folder_path = csv_path + 'columns/'
+
+    #if folders for saving csv does not exist, create directory
+    if not os.path.exists(folder_path):
+        os.makedirs(folder_path)
         
-        for value in dataframe.get(column_name):
-            column_values.append(value)
+    full_path = folder_path + filename
+    result.to_csv(full_path, encoding='utf-8', index=False)
 
-        data_dict[column_name] = column_values
-
-        if csv_path != '':
-            filename = table + '_' + column_name + '.csv'
-            folder_path = csv_path + 'columns/'
-
-            #if folders for saving csv does not exist, create directory
-            if not os.path.exists(folder_path):
-                os.makedirs(folder_path)
-                
-            full_path = folder_path + filename
-            dataframe.to_csv(full_path, encoding='utf-8', index=False)
-
-            print("Saved csv file to", full_path)
+    print("Saved csv file to", full_path)
     
-    elif scope == 'table':
-        column_list = dataframe.columns
-        
-        for column in column_list:
-            column_values = []
-            
-            for value in dataframe.get(column):
-                column_values.append(value)
+    return result
 
-            data_dict[column] = column_values
-
-        if csv_path != '':
-            filename = table + '.csv'
-            folder_path = csv_path + 'tables/'
-
-            if not os.path.exists(folder_path):
-                os.makedirs(folder_path)
-
-            full_path = folder_path + filename
-            dataframe.to_csv(full_path, encoding='utf-8', index=False)
-
-            print("Saved csv file to", full_path)
-    
-    elif scope == 'site':
-        nested_dict = {}
-        column_list = dataframe.columns
-        
-        for column in column_list:
-            column_values = []
-            
-            for value in dataframe.get(column):
-                column_values.append(value)
-
-            nested_dict[column] = column_values
-        data_dict[table] = nested_dict
-
-        if csv_path != '':
-            site = data_dict['site']['id'][0]
-            filename = table + '.csv'
-            folder_path = csv_path + '/sites/' + site + '/tables/'
-
-            if not os.path.exists(folder_path):
-                os.makedirs(folder_path)
-
-            full_path = folder_path + filename
-            dataframe.to_csv(full_path, encoding='utf-8', index=False)
-    
-    else:
-        print("'scope' argument for store_read_data() must be 'column', 'table', or 'site'")
-
-    return data_dict
-    
          
 ##### CLASSES #####
 class MismatchIDError(Exception):
