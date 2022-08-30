@@ -500,7 +500,7 @@ def displaySite(siteID, connection):
 
     return df_list
 
-def getParameterDicts(stationID, connection):
+def getParameterDicts(stationID, unix_time, connection):
     '''
     Given a stationID, return parameter dictionaries for extrinsics, intrinsics, metadata, and local origin.
     Extrinsics, intrinsics, and metadata will be stored as lists, where each item in the list is a dictionary of
@@ -508,7 +508,7 @@ def getParameterDicts(stationID, connection):
     Inputs:
         stationID (string) - specifies the "id" field for the "station" table, which is also the "stationID" field in the
                              "camera" table
-        output_path (string) - specifies the folder where the YAML files will be saved to
+        unix_time (int) - timestamp of the filename needed for searching relevant data
         connection (pymysql.connections.Connection object) - Object representing connection to DB
     Outputs:
         extrinsics (list) - list of extrinsic paramater dictionaries. One dictionary for each camera.
@@ -517,7 +517,8 @@ def getParameterDicts(stationID, connection):
         local_origin (dictionary) - dictionary of local origin parameters
     '''
 
-    query = "SELECT * FROM camera WHERE stationID = '{}'".format(stationID)
+    query = "SELECT * FROM camera WHERE stationID = '{}' AND timeIN <= {} AND timeOUT >= {} ".format(stationID, unix_time, unix_time)
+    print(query)
 
     result = pd.read_sql(query, con=connection)
     camera_list = []
@@ -537,84 +538,86 @@ def getParameterDicts(stationID, connection):
     #name for metadata dict
     name = result.get('name')[0]
 
-    for i in range(0, len(camera_list)):
+    if len(camera_list) != 0:
 
-        ###GET METADATA###
-        #yaml_metadata_dict is dict of YAML field names and corresponding values
-        metadata_dict = {}
+        for i in range(0, len(camera_list)):
 
-        metadata_dict['name'] = name
+            ###GET METADATA###
+            #yaml_metadata_dict is dict of YAML field names and corresponding values
+            metadata_dict = {}
 
-        query = "SELECT cameraSN, cameraNumber,timeIN, li_IP FROM camera WHERE id = '{}'".format(camera_list[i])
+            metadata_dict['name'] = name
+
+            query = "SELECT cameraSN, cameraNumber,timeIN, li_IP FROM camera WHERE id = '{}'".format(camera_list[i])
+            result = pd.read_sql(query, con=connection)
+            metadata_dict['serial_number'] = result.get('cameraSN')[0]
+            metadata_dict['camera_number'] = result.get('cameraNumber')[0]
+            metadata_dict['calibration_date'] = result.get('timeIN')[0]
+
+            #key for accessing IP table
+            IP = result.get('li_IP')[0]
+
+            metadata_dict['coordinate_system'] = 'geo'
+
+            metadata_dict_list.append(metadata_dict)
+            
+
+            ###GET INTRINSICS###
+            intrinsic_dict = {}
+
+            query = "SELECT width, height FROM ip WHERE id = '{}'".format(IP)
+            result = pd.read_sql(query, con=connection)
+            intrinsic_dict['NU'] = result.get('width')[0]
+            intrinsic_dict['NV'] = result.get('height')[0]
+
+            #get matrices for rest of intrinsics
+            K = db2np(connection, 'camera' , 'K', ID=camera_list[i])
+            kc = db2np(connection, 'camera', 'kc', ID=camera_list[i])
+            intrinsic_dict['fx'] = K[0][0]
+            intrinsic_dict['fy'] = K[1][1]
+            intrinsic_dict['c0U'] = K[0][2]
+            intrinsic_dict['c0V'] = K[1][2]
+            intrinsic_dict['d1'] = kc[0]
+            intrinsic_dict['d2'] = kc[1]
+            intrinsic_dict['d3'] = kc[2]
+            intrinsic_dict['t1'] = kc[3]
+            intrinsic_dict['t2'] = kc[4]
+
+            intrinsic_dict_list.append(intrinsic_dict)
+            
+
+            ###GET EXTRINSICS###
+            extrinsic_dict = {}
+
+            query = "SELECT x, y, z FROM camera WHERE id = '{}'".format(camera_list[i])
+            result = pd.read_sql(query, con=connection)
+            extrinsic_dict['x'] = result.get('x')[0]
+            extrinsic_dict['y'] = result.get('y')[0]
+            extrinsic_dict['z'] = result.get('z')[0]
+
+            query = "SELECT azimuth, tilt, roll FROM geometry WHERE cameraID = '{}'".format(camera_list[i])
+            result = pd.read_sql(query, con=connection)
+            extrinsic_dict['a'] = result.get('azimuth')[0]
+            extrinsic_dict['t'] = result.get('tilt')[0]
+            extrinsic_dict['r'] = result.get('roll')[0]
+
+            extrinsic_dict_list.append(extrinsic_dict)
+            
+
+        ###GET LOCAL ORIGIN DICT###
+        local_origin_dict = {}
+        query = "SELECT UTMEasting, UTMNorthing, degFromN FROM site WHERE id = '{}'".format(siteID)
         result = pd.read_sql(query, con=connection)
-        metadata_dict['serial_number'] = result.get('cameraSN')[0]
-        metadata_dict['camera_number'] = result.get('cameraNumber')[0]
-        metadata_dict['calibration_date'] = result.get('timeIN')[0]
+        local_origin_dict['x'] = result.get('UTMEasting')[0]
+        local_origin_dict['y'] = result.get('UTMNorthing')[0]
+        local_origin_dict['angd'] = result.get('degFromN')[0]
 
-        #key for accessing IP table
-        IP = result.get('li_IP')[0]
+        extrinsics = extrinsic_dict_list
+        intrinsics = intrinsic_dict_list
+        metadata = metadata_dict_list
+        local_origin = local_origin_dict
 
-        metadata_dict['coordinate_system'] = 'geo'
-
-        metadata_dict_list.append(metadata_dict)
-        
-
-        ###GET INTRINSICS###
-        intrinsic_dict = {}
-
-        query = "SELECT width, height FROM ip WHERE id = '{}'".format(IP)
-        result = pd.read_sql(query, con=connection)
-        intrinsic_dict['NU'] = result.get('width')[0]
-        intrinsic_dict['NV'] = result.get('height')[0]
-
-        #get matrices for rest of intrinsics
-        K = db2np(connection, 'camera' , 'K', ID=camera_list[i])
-        kc = db2np(connection, 'camera', 'kc', ID=camera_list[i])
-        intrinsic_dict['fx'] = K[0][0]
-        intrinsic_dict['fy'] = K[1][1]
-        intrinsic_dict['c0U'] = K[0][2]
-        intrinsic_dict['c0V'] = K[1][2]
-        intrinsic_dict['d1'] = kc[0]
-        intrinsic_dict['d2'] = kc[1]
-        intrinsic_dict['d3'] = kc[2]
-        intrinsic_dict['t1'] = kc[3]
-        intrinsic_dict['t2'] = kc[4]
-
-        intrinsic_dict_list.append(intrinsic_dict)
-        
-
-        ###GET EXTRINSICS###
-        extrinsic_dict = {}
-
-        query = "SELECT x, y, z FROM camera WHERE id = '{}'".format(camera_list[i])
-        result = pd.read_sql(query, con=connection)
-        extrinsic_dict['x'] = result.get('x')[0]
-        extrinsic_dict['y'] = result.get('y')[0]
-        extrinsic_dict['z'] = result.get('z')[0]
-
-        query = "SELECT azimuth, tilt, roll FROM geometry WHERE cameraID = '{}'".format(camera_list[i])
-        result = pd.read_sql(query, con=connection)
-        extrinsic_dict['a'] = result.get('azimuth')[0]
-        extrinsic_dict['t'] = result.get('tilt')[0]
-        extrinsic_dict['r'] = result.get('roll')[0]
-
-        extrinsic_dict_list.append(extrinsic_dict)
-        
-
-    ###GET LOCAL ORIGIN DICT###
-    local_origin_dict = {}
-    query = "SELECT UTMEasting, UTMNorthing, degFromN FROM site WHERE id = '{}'".format(siteID)
-    result = pd.read_sql(query, con=connection)
-    local_origin_dict['x'] = result.get('UTMEasting')[0]
-    local_origin_dict['y'] = result.get('UTMNorthing')[0]
-    local_origin_dict['angd'] = result.get('degFromN')[0]
-
-    extrinsics = extrinsic_dict_list
-    intrinsics = intrinsic_dict_list
-    metadata = metadata_dict_list
-    local_origin = local_origin_dict
-
-    return extrinsics, intrinsics, metadata, local_origin
+        return extrinsics, intrinsics, metadata, local_origin
 
     
 def filename2param(filename, connection):
@@ -622,7 +625,8 @@ def filename2param(filename, connection):
     Given the filename of a CoastCam image (with the short name of the station in the filename), create a Python object
     that stores important rectification parameters: extrinsics, intrinsics, metadata, local origin. Extrinsics, intrinsics, and
     metadata will be stored as lists, where each item in the list is a dictionary of parameters. There will be one dictionary for
-    each camera at the station.
+    each camera at the station. Is the unix time in the filename to search the database for data that corresponds to this time--this
+    will use timeIN and timeOUT fields.
     Inputs:
         filename(string) - image filename
         connection (pymysql.connections.Connection object) - object representing the connection to the DB
@@ -631,31 +635,37 @@ def filename2param(filename, connection):
         return None if the filename doesn't match any existing station short names
     '''
 
+    filename_elements = filename.split('.')
+    unix_time = int(filename_elements[0])
     query = "SELECT shortName FROM station"
     result = pd.read_sql(query, con=connection)
     shortName = result.get('shortName')
 
-    #check to see if any of the station shortnames exist in the given filename
-    for i, name in enumerate(shortName):
+    try:
+        #check to see if any of the station shortnames exist in the given filename
+        for i, name in enumerate(shortName):
 
-        if name in filename:
+            if str(name) in filename:
 
-            print("Short name '{}' found in filename {}".format(name, filename))
+                print("Short name '{}' found in filename {}".format(name, filename))
 
-            query = "SELECT id FROM station WHERE shortName = '{}'".format(name)
-            result = pd.read_sql(query, con=connection)
-            stationID = result.get('id')[0]
+                query = "SELECT id FROM station WHERE shortName = '{}'".format(name)
+                result = pd.read_sql(query, con=connection)
+                stationID = result.get('id')[0]
 
-            extrinsics, intrinsics, metadata, local_origin = getParameterDicts(stationID, connection)
+                extrinsics, intrinsics, metadata, local_origin = getParameterDicts(stationID, unix_time, connection)
 
-            params = Parameter(extrinsics=extrinsics, intrinsics=intrinsics, metadata=metadata, local_origin=local_origin)
-            return params
+                params = Parameter(extrinsics=extrinsics, intrinsics=intrinsics, metadata=metadata, local_origin=local_origin)
+                return params
 
-        else:
-            #whole list has been checked
-            if i == len(shortName) - 1:
-                print('no existing station short names match the given filename')
-                return None
+            else:
+                #whole list has been checked
+                if i == len(shortName) - 1:
+                    print('no existing station short names match the given filename')
+                    return None
+    except:
+        print("unable to get parameters")
+        return None
 
 
 def check_duplicate_id(table, ID, connection):

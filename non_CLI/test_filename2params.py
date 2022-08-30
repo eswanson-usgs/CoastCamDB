@@ -2,7 +2,7 @@
 
 from coastcamDBfuncs import *
 
-filename = "1636052400.Thu.Nov.04_19_00_00.GMT.2021.examplexx.Camera1.bright.jpg"
+filename = "1660734000.Wed.Aug.17_11_0_0.GMT.2022.examplexx.c1.snap.jpg"
 
 connection = DBConnectCSV("C:/Users/eswanson/OneDrive - DOI/Documents/Python/db_access.csv")
 
