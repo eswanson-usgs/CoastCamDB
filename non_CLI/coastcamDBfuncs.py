@@ -943,7 +943,64 @@ def site2csv(siteID, csv_path, connection):
     print("Saved csv files to", folder_path)
 
     return output_list
-        
+
+
+def csv2db(csv_path, connection):
+    '''
+    Use a csv file to add data to a table in a database. The csv will be taken froma  template where there is 1 row for the column
+    headers and 1 row of data. id field must not be blank (if applicable) and Foreign key values must be included (if applicable).
+    Filename must be [table name].csv
+    Inputs:
+        csv_path (string) - filepath to the csv file
+        connection (pymysql.connections.Connection object) - object representing the connection to the DB
+    Outputs:
+        none
+    '''
+
+    with open(csv_path, 'r') as csv_file:
+        csvreader = csv.reader(csv_file)
+
+        for i, row in enumerate(csvreader):
+            #get rid of weird formatting from UTF-8 encoding
+            row[0] = row[0].replace('ï»¿', '')
+
+            if i == 0:
+                column_names = row
+            elif i == 1:
+                column_values = row
+
+    validTables = ['site', 'station', 'gcp', 'camera', 'cameramodel', 'lensmodel' , 'ip', 'geometry', 'usedgcp']
+    fk_column_list = ['siteID', 'stationID', 'modelID', 'lensmodelID', 'li_IP', 'cameraID', 'siteID', 'gcpID', 'geometrySequence']
+
+    path_elements = csv_path.split('/')
+    filename = path_elements[-1]
+    filename_elements = filename.split('.')
+
+    try:
+        table_name = filename_elements[0]
+        if table_name not in validTables:
+            raise Exception
+    except:
+        print('Not a valid table name in the filename')
+        return
+
+    table = Table(table_name, 'coastcamdb', connection)
+    for i, column in enumerate(column_names):
+
+        if column in fk_column_list:
+            table.__dict__[column] = fkColumn(column_name=column, table=table, value=column_values[i])
+
+        elif column == 'id':
+            table.__dict__[column] = idColumn(table=table, value=column_values[i])
+
+        else:
+            table.__dict__[column] = Column(column_name=column, table=table, value=column_values[i])
+
+    table.insertTable2db()
+
+
+            
+      
          
 ##### CLASSES #####
 class MismatchIDError(Exception):
@@ -1286,6 +1343,8 @@ class Table:
         if len(fk_columns) > 1:
             print('mulitple fk')
 
+            returnSeqListFlag = True
+
             #check value list for all fk columns have the same length
             try:
                 for i in range(0, len(fk_columns)):
@@ -1304,20 +1363,22 @@ class Table:
 
                     fk_args[i][column.column_name] = column.value_list[i]
 
-            if (self.table_name == 'usedgcp') or (self.table_name == 'geometry'):
-                returnSeqListFlag = True
+##            if (self.table_name == 'usedgcp') or (self.table_name == 'geometry'):
+##                returnSeqListFlag = True
 
             seq_list = self.insertMultipleFK(returnSeqListFlag=returnSeqListFlag)
             
         elif len(fk_columns) == 1:
             print('1 fk')
 
+            returnSeqListFlag = True
+
             for i in range(0, len(fk_columns[0].value_list)):
 
                 fk_args.append({fk_columns[0].column_name : fk_columns[0].value_list[i]})
 
-            if (self.table_name == 'usedgcp') or (self.table_name == 'geometry'):
-                returnSeqListFlag = True
+##            if (self.table_name == 'usedgcp') or (self.table_name == 'geometry'):
+##                returnSeqListFlag = True
 
             seq_list = fk_columns[0].insert2db(returnSeqListFlag=returnSeqListFlag)
             
@@ -1340,10 +1401,10 @@ class Table:
         #vvv ADD ALL OTHER COLUMNS vvv#
         if (self.table_name == 'geometry') or (self.table_name == 'usedgcp'):
             for i in range(0, len(other_columns)):
-                other_columns[i].insert2db(fk_args=fk_args)
+                other_columns[i].update2db(seq_list=seq_list)
         else:
             for i in range(0, len(other_columns)):
-                other_columns[i].insert2db(fk_args=fk_args)
+                other_columns[i].update2db(id_list=id_list)
                 
     def disp_db_table(self):
         '''
@@ -1547,8 +1608,6 @@ class Column:
             elif isinstance(fk_value, int):
                 query = "SELECT {} FROM {} WHERE {} = {}".format(fk_column, self.table.table_name, fk_column, fk_value)
                 #ex: select geometrySequence from usedgcp where geometrySequence = 1
-                
-            print(query)
 
             result = pd.read_sql(query, con=self.connection)
             
@@ -1664,184 +1723,6 @@ class Column:
             hasBlankID = True
 
         return hasBlankID
-
-
-    def input_id_seq(self, value):
-        '''
-        Given an existing value in a column, prompt the user to select an id/seq value. There are two modes: 'insert' and 'update'.
-        In 'insert' mode, no value argument is needed and all id/seq values for the table aare displayed to user to select from.
-        In 'update' mode, the value is used in the query to get id/seq associated with that value.
-        Inputs:
-            value (string) - exisitng value in the table used to search the table
-        Outputs:
-            idseq (string or int) - id (string) or seq (int) that the user selects
-        '''
-
-        idseq = ''
-
-        if (self.table.table_name == 'usedgcp') or (self.table.table_name == 'geometry'):
-            key = "seq"
-            #account for NULL values
-            if value == 'None':
-                query = "SELECT seq, {} FROM {} WHERE {} IS NULL".format(self.column_name, self.table.table_name, self.column_name)
-            else:
-                query = "SELECT seq, {} FROM {} WHERE {} = '{}'".format(self.column_name, self.table.table_name, self.column_name, value)
-        else:
-            key = "id"
-            if value == 'None':
-                query = "SELECT id, {} FROM {} WHERE {} IS NULL".format(self.column_name, self.table.table_name, self.column_name)
-            else:
-                query = "SELECT id, {} FROM {} WHERE {} = '{}'".format(self.column_name, self.table.table_name, self.column_name, value)
-
-        result = get_formatted_result(query, self.connection)
-        print("Please enter a {} listed from the values below.".format(key))
-        print("vv  Available options are listed below vv")
-        print(result)
-
-        avail_idseq = []
-        for identifier in result.get(key):
-            avail_idseq.append(str(identifier))
-
-        isGoodIDSeq = False
-        while not isGoodIDSeq:
-            
-            idseq = input("~~~Enter an id/seq value: ")
-
-            if idseq.strip() == 'quit':
-                quit()
-
-            if idseq in avail_idseq:
-                isGoodIDSeq = True
-                #special cases to return seq as int for usedgcp and geometry tables
-                if (self.table.table_name == 'usedgcp') or (self.table.table_name == 'geometry'):
-                    idseq = int(idseq)
-                return idseq
-            else:
-                print("Invalid id/seq value. Please try again.")
-
-
-    def get_fk_args(self):
-        '''
-        Get fk args for this column--used for inserting/updating this column with the command line interface.
-        Inputs:
-            none
-        Outputs:
-            fk_args (list) - list of dictionaries used for foreign key arguments. Each dictionary will correspond to an
-                             id being inserted into the table. Only one key/value of an fk column/value pair per id is actually
-                             needed in each dictionary. The key will be the fk column name and the value will be the column value.
-        '''
-        fk_args = []
-
-        if (self.table.table_name == 'station') or (self.table.table_name == 'gcp'):
-            key = 'siteID'
-
-            try:
-                #if empty foreign key columns, throw error
-                if self.table.table_name == 'station':
-                    query = "SELECT siteID FROM station"
-                else:
-                    query = "SELECT siteID FROM gcp"
-
-                result = pd.read_sql(query, con=self.connection)
-                if result.size == 0:
-                    raise FKError(message="no foreign key values in table '{}'".format(self.table.table_name))
-            except FKError as e:
-                sys.exit(e.message)
-            
-        elif self.table.table_name == 'camera':
-            key = 'stationID'
-
-            try:
-                #check if stationID blank in table
-                query = "SELECT stationID FROM camera"
-                result = pd.read_sql(query, con=self.connection)
-                if result.size == 0:
-                    key = 'cameramodelID'
-
-                    #need to check if cameramodelID is blank too
-                    query = "SELECT cameramodelID FROM camera"
-                    result = pd.read_sql(query, con=self.connection)
-                    if result.size == 0:
-                        key = 'lensmodelID'
-
-                        #need to check if lensmodelID is blank too
-                        query = "SELECT lensmodelID FROM camera"
-                        result = pd.read_sql(query, con=self.connection)
-                        if result.size == 0:
-                            key = 'li_IP'
-
-                            #li_IP is last line of defense. If empty, throw error
-                            query = "SELECT li_IP FROM camera"
-                            result = pd.read_sql(query, con=self.connection)
-                            if result.size == 0:
-                                raise FKError(message="no foreign key values in table 'camera'")
-            except FKError as e:
-                sys.exit(e.message)
-                            
-        elif self.table.table_name == 'geometry':
-            key = 'cameraID'
-
-            try:
-                #if empty foregin key columns, throw error
-                query = "SELECT cameraID FROM geometry"
-                result = pd.read_sql(query, con=self.connection)
-                if result.size == 0:
-                    raise FKError(message="no foreign key values in table 'geometry'")
-            except FKError as e:
-                sys.exit(e.message)
-                
-        elif self.table.table_name == 'usedgcp':
-            key = 'gcpID'
-
-            try:
-                #check if gcpID blank in table
-                query = "SELECT gcpID FROM usedgcp"
-                result = pd.read_sql(query, con=self.connection)
-                if result.size == 0:
-                    key = 'geometrySequence'
-
-                    #need to check if geometrySequence is blank too
-                    query = "SELECT geometrySequence FROM usedgcp"
-                    result = pd.read_sql(query, con=self.connection)
-                    if result.size == 0:
-                        raise FKError(message="no foreign key values in table 'usedgcp'")
-            except FKError as e:
-                sys.exit(e.message)
-
-        #get available foreign key options for user to select
-        query = "SELECT {} FROM {} ".format(key, self.table.table_name)
-        result = get_formatted_result(query, self.connection)
-        result = result.drop_duplicates(subset=key, keep='first')
-        result_str = result.to_string(header=False)
-        print("Please enter a {} listed from the values below.".format(key))
-        print("vv  Available options are listed below vv")
-        print(result_str)
-
-        avail_id = []
-        for ID in result.get(key):
-            avail_id.append(ID)
-
-        isGoodID = False
-        while not isGoodID:
-
-            fk_value = input("~~~Enter a {}: ".format(key))
-
-            if fk_value.strip() == 'quit':
-                quit()
-                
-            if fk_value.strip() in avail_id:
-                isGoodID = True
-                fk_args.append({key : fk_value})
-            else:
-                print('Invalid {}, please try again.\n'.format(key))
-
-        query = "SELECT {} FROM {} WHERE {} = '{}'".format(self.column_name, self.table.table_name, key, fk_value)
-        result = get_formatted_result(query, self.connection)
-        result_str = result.to_string(header=False)
-        print("\nCurrent value(s) in {} for {} where {} = {}".format(self.table.table_name, self.column_name, key, fk_value))
-        print(result_str)
-
-        return fk_args       
 
 
     def check_blank_value(self, idseq):
@@ -1995,7 +1876,8 @@ class Column:
                         if ID == '':
                             hasBlankID = True
                             break
-                        
+
+                    
                     try:
                         #if there's a blank id in the same row as the specified foreign key, update the column in that row insteasd of inserting new row
                         if hasBlankID:
@@ -2038,7 +1920,7 @@ class Column:
         self.value_list = []
         
 
-    def update2db(self, old_value, id_list=[], seq_list=[], fk_args=[], returnSeqListFlag=False):
+    def update2db(self, id_list=[], seq_list=[], fk_args=[], returnSeqListFlag=False):
         '''
         Update a value in for this column in the database. Specify the row using a value for id or seq
         Inserts:
@@ -2063,11 +1945,18 @@ class Column:
                 raise EmptyValueError(message="EmptyValueError: Empty value list for column '{}'".format(self.column_name))
         except Exception as e:
             sys.exit(e.message)
+
+
+        #if column is foreign key, insert using the special subclass function for fk instead
+        if isinstance(self, fkColumn):
+            
+            seq_list = self.insertNewFK(returnSeqListFlag)
+            return seq_list
             
         #if column is id, use subclass function
-        if isinstance(self, idColumn):
-            
-            self.updateID(old_value)
+        elif isinstance(self, idColumn):
+
+            self.insertNewID(fk_args)
 
         else:
 
@@ -2179,7 +2068,6 @@ class Column:
         #clear list once all values have been inserted into DB
         self.value_list = []
 
-
     def valueFromDB(self, id_seq):
         '''
         Retrieve the value of the column from the database given a specfified id or seq value.
@@ -2231,13 +2119,15 @@ class idColumn(Column):
         Column.__init__(self, column_name='id', table=table, value=value)
 
 
-    def insertNewID(self, fk_args = []):
+    def insertNewID(self, fk_args = [], seq_list = []):
         '''
         Insert new id column value(s) into the database. USes foreign keys where necessary.
         Inputs:
             fk_args (list) - list of dictionaries used for foreign key arguments. Each dictionary will correspond to an
                              id being inserted into the table. Only one key/value of an fk column/value pair per id is actually
                              needed in each dictionary. The key will be the fk column name and the value will be the column value.
+            seq_list (list) - list of seq values used to specify which row to insert the id into. Used for cases where multiple
+                              rows in a table have the same foregin key value
         Outputs:
             none
         '''
@@ -2386,11 +2276,6 @@ class fkColumn(Column):
             seq_list (list) - optional output argument that is a list of seq values from the database
         '''
 
-##        #special case for tables with multiple foreign keys
-##        if (self.table.table_name == 'camera') or (self.table.table_name == 'usedgcp'):
-##            self.table.insertMultipleFK()
-##
-##        else:
         seq_list = []
         for value in self.value_list:
 
