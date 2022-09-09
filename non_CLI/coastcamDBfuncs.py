@@ -8,6 +8,7 @@ are equivalent to the fields in the Db table
 import pandas as pd
 import pymysql
 import csv
+import datetime
 import os
 import sys
 import ast
@@ -16,6 +17,7 @@ import numpy as np
 import mysql.connector
 from mysql.connector import errorcode
 from tabulate import tabulate
+from dateutil import tz
 
 
 
@@ -619,17 +621,48 @@ def getParameterDicts(stationID, unix_time, connection):
 
         return extrinsics, intrinsics, metadata, local_origin
 
+
+
+def unix2dt(unixnumber, timezone='utc'):
+    """
+    Get local time from unix number
+    Input:
+        unixnumber (string) - string containing unix time (aka epoch)
+    Outputs:
+        date_time_string (string) - datetime string in the local user's timezone 
+        date_time_object (datetime) - datetime object in the local user's timezone
+        tzone (dateutil.tz) - dateutil timezone object
+    """
     
-def filename2param(filename, connection):
+    if timezone.lower() == 'eastern':
+        tzone = tz.gettz('America/New_York')
+    elif timezone.lower() == 'pacific':
+        tzone = tz.gettz('America/Los_Angeles')
+    elif timezone.lower() == 'utc':
+        tzone = tz.gettz('UTC')
+        
+    # replace last digit with zero
+    ts = int( unixnumber[:-1]+'0')
+    date_time_obj =  datetime.datetime.utcfromtimestamp(ts)
+    #convert from UTC to local time zone on user's machine
+    date_time_obj = date_time_obj.replace(tzinfo=datetime.timezone.utc).astimezone(tz=tzone)
+    date_time_str = date_time_obj.strftime('%Y-%m-%d %H:%M:%S')
+    return date_time_str, date_time_obj, tzone
+
+    
+def filename2param(filename, connection, timezone='utc'):
     '''
     Given the filename of a CoastCam image (with the short name of the station in the filename), create a Python object
     that stores important rectification parameters: extrinsics, intrinsics, metadata, local origin. Extrinsics, intrinsics, and
     metadata will be stored as lists, where each item in the list is a dictionary of parameters. There will be one dictionary for
     each camera at the station. Is the unix time in the filename to search the database for data that corresponds to this time--this
     will use timeIN and timeOUT fields.
+    This function will also create a datetime object in the user's local timezone (they must specify in the function arguments).
+    This datetime object will be assigned as an attribute of the Parameter object
     Inputs:
         filename(string) - image filename
         connection (pymysql.connections.Connection object) - object representing the connection to the DB
+        timezone (string) - user's local timezone. Used when returning the datetime object
     Outputs:
         params (Paramater object) - Python object storing the parameters associated with the station
         return None if the filename doesn't match any existing station short names
@@ -653,9 +686,14 @@ def filename2param(filename, connection):
                 result = pd.read_sql(query, con=connection)
                 stationID = result.get('id')[0]
 
+                filename_el = filename.split('.')
+                unix_time = filename_el[0]
+
+                date_time_str, date_time_obj, tzone = unix2dt(unix_time, timezone=timezone)
+
                 extrinsics, intrinsics, metadata, local_origin = getParameterDicts(stationID, unix_time, connection)
 
-                params = Parameter(extrinsics=extrinsics, intrinsics=intrinsics, metadata=metadata, local_origin=local_origin)
+                params = Parameter(extrinsics=extrinsics, intrinsics=intrinsics, metadata=metadata, local_origin=local_origin, date_time_obj=date_time_obj, date_time_str=date_time_str, tzone=tzone)
                 return params
 
             else:
@@ -2337,14 +2375,20 @@ class fkColumn(Column):
 class Parameter:
     '''
     Class designed to hold parameters used for image rectification: extrinsics, intrinsics, metadata, and local_origin.
+    Also hold datetime information for local time
     '''
 
-    def __init__(self, extrinsics=None, intrinsics=None, metadata=None, local_origin=None):
+    def __init__(self, extrinsics=None, intrinsics=None, metadata=None, local_origin=None, date_time_obj=None, date_time_str=None, tzone=None):
         
         self.extrinsics = extrinsics #list
         self.intrinsics = intrinsics #list
         self.metadata = metadata #list
         self.local_origin = local_origin #dict
+        
+        self.date_time_obj = date_time_obj
+        self.date_time_str = date_time_str
+        self.tzone = tzone
+        
         if extrinsics != None:
             self.num_cameras = len(extrinsics)
 
