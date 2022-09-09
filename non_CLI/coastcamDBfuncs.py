@@ -500,7 +500,7 @@ def displaySite(siteID, connection):
 
     return df_list
 
-def getParameterDicts(stationID, connection):
+def getParameterDicts(stationID, unix_time, connection):
     '''
     Given a stationID, return parameter dictionaries for extrinsics, intrinsics, metadata, and local origin.
     Extrinsics, intrinsics, and metadata will be stored as lists, where each item in the list is a dictionary of
@@ -508,7 +508,7 @@ def getParameterDicts(stationID, connection):
     Inputs:
         stationID (string) - specifies the "id" field for the "station" table, which is also the "stationID" field in the
                              "camera" table
-        output_path (string) - specifies the folder where the YAML files will be saved to
+        unix_time (int) - timestamp of the filename needed for searching relevant data
         connection (pymysql.connections.Connection object) - Object representing connection to DB
     Outputs:
         extrinsics (list) - list of extrinsic paramater dictionaries. One dictionary for each camera.
@@ -517,7 +517,8 @@ def getParameterDicts(stationID, connection):
         local_origin (dictionary) - dictionary of local origin parameters
     '''
 
-    query = "SELECT * FROM camera WHERE stationID = '{}'".format(stationID)
+    query = "SELECT * FROM camera WHERE stationID = '{}' AND timeIN <= {} AND timeOUT >= {} ".format(stationID, unix_time, unix_time)
+    print(query)
 
     result = pd.read_sql(query, con=connection)
     camera_list = []
@@ -537,84 +538,86 @@ def getParameterDicts(stationID, connection):
     #name for metadata dict
     name = result.get('name')[0]
 
-    for i in range(0, len(camera_list)):
+    if len(camera_list) != 0:
 
-        ###GET METADATA###
-        #yaml_metadata_dict is dict of YAML field names and corresponding values
-        metadata_dict = {}
+        for i in range(0, len(camera_list)):
 
-        metadata_dict['name'] = name
+            ###GET METADATA###
+            #yaml_metadata_dict is dict of YAML field names and corresponding values
+            metadata_dict = {}
 
-        query = "SELECT cameraSN, cameraNumber,timeIN, li_IP FROM camera WHERE id = '{}'".format(camera_list[i])
+            metadata_dict['name'] = name
+
+            query = "SELECT cameraSN, cameraNumber,timeIN, li_IP FROM camera WHERE id = '{}'".format(camera_list[i])
+            result = pd.read_sql(query, con=connection)
+            metadata_dict['serial_number'] = result.get('cameraSN')[0]
+            metadata_dict['camera_number'] = result.get('cameraNumber')[0]
+            metadata_dict['calibration_date'] = result.get('timeIN')[0]
+
+            #key for accessing IP table
+            IP = result.get('li_IP')[0]
+
+            metadata_dict['coordinate_system'] = 'geo'
+
+            metadata_dict_list.append(metadata_dict)
+            
+
+            ###GET INTRINSICS###
+            intrinsic_dict = {}
+
+            query = "SELECT width, height FROM ip WHERE id = '{}'".format(IP)
+            result = pd.read_sql(query, con=connection)
+            intrinsic_dict['NU'] = result.get('width')[0]
+            intrinsic_dict['NV'] = result.get('height')[0]
+
+            #get matrices for rest of intrinsics
+            K = db2np(connection, 'camera' , 'K', ID=camera_list[i])
+            kc = db2np(connection, 'camera', 'kc', ID=camera_list[i])
+            intrinsic_dict['fx'] = K[0][0]
+            intrinsic_dict['fy'] = K[1][1]
+            intrinsic_dict['c0U'] = K[0][2]
+            intrinsic_dict['c0V'] = K[1][2]
+            intrinsic_dict['d1'] = kc[0]
+            intrinsic_dict['d2'] = kc[1]
+            intrinsic_dict['d3'] = kc[2]
+            intrinsic_dict['t1'] = kc[3]
+            intrinsic_dict['t2'] = kc[4]
+
+            intrinsic_dict_list.append(intrinsic_dict)
+            
+
+            ###GET EXTRINSICS###
+            extrinsic_dict = {}
+
+            query = "SELECT x, y, z FROM camera WHERE id = '{}'".format(camera_list[i])
+            result = pd.read_sql(query, con=connection)
+            extrinsic_dict['x'] = result.get('x')[0]
+            extrinsic_dict['y'] = result.get('y')[0]
+            extrinsic_dict['z'] = result.get('z')[0]
+
+            query = "SELECT azimuth, tilt, roll FROM geometry WHERE cameraID = '{}'".format(camera_list[i])
+            result = pd.read_sql(query, con=connection)
+            extrinsic_dict['a'] = result.get('azimuth')[0]
+            extrinsic_dict['t'] = result.get('tilt')[0]
+            extrinsic_dict['r'] = result.get('roll')[0]
+
+            extrinsic_dict_list.append(extrinsic_dict)
+            
+
+        ###GET LOCAL ORIGIN DICT###
+        local_origin_dict = {}
+        query = "SELECT UTMEasting, UTMNorthing, degFromN FROM site WHERE id = '{}'".format(siteID)
         result = pd.read_sql(query, con=connection)
-        metadata_dict['serial_number'] = result.get('cameraSN')[0]
-        metadata_dict['camera_number'] = result.get('cameraNumber')[0]
-        metadata_dict['calibration_date'] = result.get('timeIN')[0]
+        local_origin_dict['x'] = result.get('UTMEasting')[0]
+        local_origin_dict['y'] = result.get('UTMNorthing')[0]
+        local_origin_dict['angd'] = result.get('degFromN')[0]
 
-        #key for accessing IP table
-        IP = result.get('li_IP')[0]
+        extrinsics = extrinsic_dict_list
+        intrinsics = intrinsic_dict_list
+        metadata = metadata_dict_list
+        local_origin = local_origin_dict
 
-        metadata_dict['coordinate_system'] = 'geo'
-
-        metadata_dict_list.append(metadata_dict)
-        
-
-        ###GET INTRINSICS###
-        intrinsic_dict = {}
-
-        query = "SELECT width, height FROM ip WHERE id = '{}'".format(IP)
-        result = pd.read_sql(query, con=connection)
-        intrinsic_dict['NU'] = result.get('width')[0]
-        intrinsic_dict['NV'] = result.get('height')[0]
-
-        #get matrices for rest of intrinsics
-        K = db2np(connection, 'camera' , 'K', ID=camera_list[i])
-        kc = db2np(connection, 'camera', 'kc', ID=camera_list[i])
-        intrinsic_dict['fx'] = K[0][0]
-        intrinsic_dict['fy'] = K[1][1]
-        intrinsic_dict['c0U'] = K[0][2]
-        intrinsic_dict['c0V'] = K[1][2]
-        intrinsic_dict['d1'] = kc[0]
-        intrinsic_dict['d2'] = kc[1]
-        intrinsic_dict['d3'] = kc[2]
-        intrinsic_dict['t1'] = kc[3]
-        intrinsic_dict['t2'] = kc[4]
-
-        intrinsic_dict_list.append(intrinsic_dict)
-        
-
-        ###GET EXTRINSICS###
-        extrinsic_dict = {}
-
-        query = "SELECT x, y, z FROM camera WHERE id = '{}'".format(camera_list[i])
-        result = pd.read_sql(query, con=connection)
-        extrinsic_dict['x'] = result.get('x')[0]
-        extrinsic_dict['y'] = result.get('y')[0]
-        extrinsic_dict['z'] = result.get('z')[0]
-
-        query = "SELECT azimuth, tilt, roll FROM geometry WHERE cameraID = '{}'".format(camera_list[i])
-        result = pd.read_sql(query, con=connection)
-        extrinsic_dict['a'] = result.get('azimuth')[0]
-        extrinsic_dict['t'] = result.get('tilt')[0]
-        extrinsic_dict['r'] = result.get('roll')[0]
-
-        extrinsic_dict_list.append(extrinsic_dict)
-        
-
-    ###GET LOCAL ORIGIN DICT###
-    local_origin_dict = {}
-    query = "SELECT UTMEasting, UTMNorthing, degFromN FROM site WHERE id = '{}'".format(siteID)
-    result = pd.read_sql(query, con=connection)
-    local_origin_dict['x'] = result.get('UTMEasting')[0]
-    local_origin_dict['y'] = result.get('UTMNorthing')[0]
-    local_origin_dict['angd'] = result.get('degFromN')[0]
-
-    extrinsics = extrinsic_dict_list
-    intrinsics = intrinsic_dict_list
-    metadata = metadata_dict_list
-    local_origin = local_origin_dict
-
-    return extrinsics, intrinsics, metadata, local_origin
+        return extrinsics, intrinsics, metadata, local_origin
 
     
 def filename2param(filename, connection):
@@ -622,7 +625,8 @@ def filename2param(filename, connection):
     Given the filename of a CoastCam image (with the short name of the station in the filename), create a Python object
     that stores important rectification parameters: extrinsics, intrinsics, metadata, local origin. Extrinsics, intrinsics, and
     metadata will be stored as lists, where each item in the list is a dictionary of parameters. There will be one dictionary for
-    each camera at the station.
+    each camera at the station. Is the unix time in the filename to search the database for data that corresponds to this time--this
+    will use timeIN and timeOUT fields.
     Inputs:
         filename(string) - image filename
         connection (pymysql.connections.Connection object) - object representing the connection to the DB
@@ -631,31 +635,37 @@ def filename2param(filename, connection):
         return None if the filename doesn't match any existing station short names
     '''
 
+    filename_elements = filename.split('.')
+    unix_time = int(filename_elements[0])
     query = "SELECT shortName FROM station"
     result = pd.read_sql(query, con=connection)
     shortName = result.get('shortName')
 
-    #check to see if any of the station shortnames exist in the given filename
-    for i, name in enumerate(shortName):
+    try:
+        #check to see if any of the station shortnames exist in the given filename
+        for i, name in enumerate(shortName):
 
-        if name in filename:
+            if str(name) in filename:
 
-            print("Short name '{}' found in filename {}".format(name, filename))
+                print("Short name '{}' found in filename {}".format(name, filename))
 
-            query = "SELECT id FROM station WHERE shortName = '{}'".format(name)
-            result = pd.read_sql(query, con=connection)
-            stationID = result.get('id')[0]
+                query = "SELECT id FROM station WHERE shortName = '{}'".format(name)
+                result = pd.read_sql(query, con=connection)
+                stationID = result.get('id')[0]
 
-            extrinsics, intrinsics, metadata, local_origin = getParameterDicts(stationID, connection)
+                extrinsics, intrinsics, metadata, local_origin = getParameterDicts(stationID, unix_time, connection)
 
-            params = Parameter(extrinsics=extrinsics, intrinsics=intrinsics, metadata=metadata, local_origin=local_origin)
-            return params
+                params = Parameter(extrinsics=extrinsics, intrinsics=intrinsics, metadata=metadata, local_origin=local_origin)
+                return params
 
-        else:
-            #whole list has been checked
-            if i == len(shortName) - 1:
-                print('no existing station short names match the given filename')
-                return None
+            else:
+                #whole list has been checked
+                if i == len(shortName) - 1:
+                    print('no existing station short names match the given filename')
+                    return None
+    except:
+        print("unable to get parameters")
+        return None
 
 
 def check_duplicate_id(table, ID, connection):
@@ -681,109 +691,316 @@ def check_duplicate_id(table, ID, connection):
     return isDuplicate
 
 
-def store_read_data(dataframe, scope, table, csv_path='', data_dict = {}):
+def column2csv(column, table, csv_path, connection):
     '''
-    After the user has read data from the database (from the user interface), this function will allow the user to use the data
-    by outputting it as a Python dictionary object.
-    
-    Depending on the scope of the data (site, table, column), there will be nested dictionaries. A column dictionary will hold a
-    single key/value pair, where the key is the column name, and the dictionary value will be a list of all the values in that
-    column in the database. A table dictionary will have a key/value pair for each column in the table. Each dictionary value will
-    again be a list of vlaues for the column from the database. For a site dictionary, there will be nested dictionaries. Each key
-    in the highest layer dictionary will be a table name; the corresponding value will be a dictionary itself for the table and will
-    format for a table dictionary described previously. However, the user will have to pass in an existing data_dict object to
-    "append" the nested dictionaries to.
-    
-    Optionally this function will also allow the dataframe to be stored in a csv. The user will specify a folder (filepath) where
-    they would like the csv(s) to be stored. If the read data is a single column, there will be a single csv file for that column.
-    If the read data is a table, there will be a single csv file for that table. If the read data is a site, there will be one csv
-    per non-empty table for the site.
+    Store a data read from a column in the database into a csv file. There will be a single file for the column.
     Inputs:
-        dataframe (Pandas dataframe object) - The read data from the database in the form of a Python 
+        column (string) - column name
         csv_path (string) - optional input specified by the user for where they'd like to store csvs of the data read from
                                  the database.
-        scope (string) - defines the scope of the data being read: 'site' ,'table', or 'column'
         table (string) - input needed when writing  to csv because nott every column name in the database is unique.
+        connection (pymysql.connections.Connection object) - object representing the connection to the DB
     Outputs:
-        data_dict (dictionary) - Python dictionary object of the read data
+        result (Pandas dataframe) - resultant dataframe containing column data
     '''
 
-    csv_path = csv_path.replace('\\', '/')
-    
-    if scope == 'column':
-        column_name = dataframe.columns[0]
-        column_values = []
+    query = "SELECT {} FROM {}".format(column, table)
+    result = get_formatted_result(query, connection)
+
+    filename = table + '_' + column + '.csv'
+    folder_path = csv_path + 'columns/'
+
+    #if folders for saving csv does not exist, create directory
+    if not os.path.exists(folder_path):
+        os.makedirs(folder_path)
         
-        for value in dataframe.get(column_name):
-            column_values.append(value)
+    full_path = folder_path + filename
+    result.to_csv(full_path, encoding='utf-8', index=False)
 
-        data_dict[column_name] = column_values
-
-        if csv_path != '':
-            filename = table + '_' + column_name + '.csv'
-            folder_path = csv_path + 'columns/'
-
-            #if folders for saving csv does not exist, create directory
-            if not os.path.exists(folder_path):
-                os.makedirs(folder_path)
-                
-            full_path = folder_path + filename
-            dataframe.to_csv(full_path, encoding='utf-8', index=False)
-
-            print("Saved csv file to", full_path)
+    print("Saved csv file to", full_path)
     
-    elif scope == 'table':
-        column_list = dataframe.columns
+    return result
+
+
+def table2csv(table, csv_path, connection):
+    '''
+    Store a data read from a table in the database into a csv file. There will be a single file for the table.
+    Inputs:
+        csv_path (string) - optional input specified by the user for where they'd like to store csvs of the data read from
+                                 the database.
+        table (string) - table name
+        connection (pymysql.connections.Connection object) - object representing the connection to the DB
+    Outputs:
+        result (Pandas dataframe) - resultant dataframe containing column data
+    '''
+
+    query = "SELECT * FROM {}".format(table)
+    result = get_formatted_result(query, connection)
+
+    filename = table + '.csv'
+    folder_path = csv_path + 'tables/'
+
+    #if folders for saving csv does not exist, create directory
+    if not os.path.exists(folder_path):
+        os.makedirs(folder_path)
         
-        for column in column_list:
-            column_values = []
+    full_path = folder_path + filename
+    result.to_csv(full_path, encoding='utf-8', index=False)
+
+    print("Saved csv file to", full_path)
+    
+    return result
+
+
+def site2csv(siteID, csv_path, connection):
+    '''
+    Store a data read from a site in the database into a csv file using a specific siteID. There will be a folder for the site
+    where there's one csv file per table.
+    Inputs:
+        csv_path (string) - optional input specified by the user for where they'd like to store csvs of the data read from
+                                 the database.
+        table (string) - table name
+        connection (pymysql.connections.Connection object) - object representing the connection to the DB
+    Outputs:
+        output_list (list) - list of Pandas datframes, one for each non-empty table associated with the given siteID
+    '''
+
+    df_list = []
+
+    #site
+    query = "SELECT * FROM site WHERE id = '{}'".format(siteID)
+    result = get_formatted_result(query, connection)
+
+    #don't add empty tables to the dataframe list
+    if not result.empty:
+        df_tuple = ('site', result)
+        df_list.append(df_tuple)
+
+    #station
+    query = "SELECT * FROM station WHERE siteID = '{}'".format(siteID)
+    result = get_formatted_result(query, connection)
+    stationID = result.get('id')
+    try:
+        if result.empty:
+            raise Exception
+
+        df_tuple = ('station', result)
+        df_list.append(df_tuple)
+    except:
+        pass
+
+    #camera
+    camera_result = []
+    try:
+        for ID in stationID:
+            query = "SELECT * FROM camera WHERE stationID = '{}'".format(ID)
+            camera_result.append(pd.read_sql(query, con=connection))
+        #account for multiple stations. Concatenate all results into 1 dataframe
+        if len(stationID) > 1:
+            result = pd.concat(camera_result, axis=0)
+        else:
+            result = camera_result[0]
+        cameraID = result.get('id')
+        modelID = result.get('modelID')
+        lensmodelID = result.get('lensmodelID')
+        li_IP = result.get('li_IP')
+        blankIndex = [''] * len(result)
+        result.index = blankIndex
+
+        if not result.empty:
+            df_tuple = ('camera', result)
+            df_list.append(df_tuple)
+    except:
+        pass
+
+    #cameramodel
+    cameramodel_result = []
+    try:
+        for ID in modelID:
+            query = "SELECT * FROM cameramodel WHERE id = '{}'".format(ID)
+            cameramodel_result.append(pd.read_sql(query, con=connection))
+        #account for multiple stations. Concatenate all results into 1 dataframe
+        if len(modelID) > 1:
+            result = pd.concat(cameramodel_result, axis=0)
+            result = result.drop_duplicates(subset='id', keep='first')
+        else:
+            result = cameramodel_result[0]
+
+        if not result.empty:
+            df_tuple = ('cameramodel', result)
+            df_list.append(df_tuple)
+    except:
+        pass
+
+    #lensmodel
+    lensmodel_result = []
+    try:
+        for ID in lensmodelID:
+            query = "SELECT * FROM lensmodel WHERE id = '{}'".format(ID)
+            lensmodel_result.append(pd.read_sql(query, con=connection))
+        if len(lensmodelID) > 1:
+            result = pd.concat(lensmodel_result, axis=0)
+            result = result.drop_duplicates(subset='id', keep='first')
+        else:
+            result = lensmodel_result[0]
+
+        if not result.empty:
+            df_tuple = ('lensmodel', result)
+            df_list.append(df_tuple)
+    except:
+        pass
+
+    #ip
+    li_IP_result = []
+    try:
+        for ID in li_IP:
+            query = "SELECT * FROM ip WHERE id = '{}'".format(ID)
+            li_IP_result.append(pd.read_sql(query, con=connection))
+        if len(li_IP) > 1:
+            result = pd.concat(li_IP_result, axis=0)
+            result = result.drop_duplicates(subset='id', keep='first')
+        else:
+            result = li_IP_result[0]
+
+        if not result.empty:
+            df_tuple = ('ip', result)
+            df_list.append(df_tuple)
+    except:
+        pass
+    
+    #gcp
+    query = "SELECT * FROM gcp WHERE siteID = '{}'".format(siteID)
+    result = get_formatted_result(query, connection)
+    gcpID = result.get('id')
+    try:
+        if result.empty:
+            raise Exception
+
+        if not result.empty:
+            df_tuple = ('gcp', result)
+            df_list.append(df_tuple)
+    except:
+        pass
+
+    #geometry
+    geometry_result = []
+    try:
+        for ID in cameraID:
+            query = "SELECT * FROM geometry WHERE cameraID = '{}'".format(ID)
+            geometry_result.append(pd.read_sql(query, con=connection))
+        if len(cameraID) > 1:
+            result = pd.concat(geometry_result, axis=0)
+            result = result.drop_duplicates(subset='seq', keep='first')
+        else:
+            result = geometry_result[0]
+        geometrySequence = result.get('seq')
+
+        if not result.empty:
+            df_tuple = ('geometry', result)
+            df_list.append(df_tuple)
+    except:
+        pass
+
+    #usedgcp
+    try:
+        usedgcp_result = []
+        for ID in gcpID:
+            for seq in geometrySequence:
+                query = "SELECT * FROM usedgcp WHERE gcpID = '{}' AND geometrySequence = {}".format(ID, seq)
+                usedgcp_result.append(pd.read_sql(query, con=connection))
+        if (len(gcpID) > 1) or (len(geometrySequence) > 1):
+            result = pd.concat(usedgcp_result, axis=0)
+            result = result.drop_duplicates(subset='seq', keep='first')
+        else:
+            result = usedgcp_result[0]
+
+        if not result.empty:
+            df_tuple = ('usedgcp', result)
+            df_list.append(df_tuple)
+    except:
+        pass
+
+    #list of dataframes to output
+    output_list = []
+
+    #add tables to csv files
+    for df_tuple in df_list:
+        table = df_tuple[0]
+        df = df_tuple[1]
+
+        output_list.append(df)
+
+        filename = table + '.csv'
+        folder_path = csv_path + '/sites/' + siteID + '/tables/'
+
+        #if folders for saving csv does not exist, create directory
+        if not os.path.exists(folder_path):
+            os.makedirs(folder_path)
             
-            for value in dataframe.get(column):
-                column_values.append(value)
+        full_path = folder_path + filename
+        df.to_csv(full_path, encoding='utf-8', index=False)
 
-            data_dict[column] = column_values
+    print("Saved csv files to", folder_path)
 
-        if csv_path != '':
-            filename = table + '.csv'
-            folder_path = csv_path + 'tables/'
+    return output_list
 
-            if not os.path.exists(folder_path):
-                os.makedirs(folder_path)
 
-            full_path = folder_path + filename
-            dataframe.to_csv(full_path, encoding='utf-8', index=False)
+def csv2db(csv_path, connection):
+    '''
+    Use a csv file to add data to a table in a database. The csv will be taken froma  template where there is 1 row for the column
+    headers and 1 row of data. id field must not be blank (if applicable) and Foreign key values must be included (if applicable).
+    Filename must be [table name].csv
+    Inputs:
+        csv_path (string) - filepath to the csv file
+        connection (pymysql.connections.Connection object) - object representing the connection to the DB
+    Outputs:
+        none
+    '''
 
-            print("Saved csv file to", full_path)
-    
-    elif scope == 'site':
-        nested_dict = {}
-        column_list = dataframe.columns
-        
-        for column in column_list:
-            column_values = []
+    with open(csv_path, 'r') as csv_file:
+        csvreader = csv.reader(csv_file)
+
+        for i, row in enumerate(csvreader):
+            #get rid of weird formatting from UTF-8 encoding
+            row[0] = row[0].replace('ï»¿', '')
+
+            if i == 0:
+                column_names = row
+            elif i == 1:
+                column_values = row
+
+    validTables = ['site', 'station', 'gcp', 'camera', 'cameramodel', 'lensmodel' , 'ip', 'geometry', 'usedgcp']
+    fk_column_list = ['siteID', 'stationID', 'modelID', 'lensmodelID', 'li_IP', 'cameraID', 'siteID', 'gcpID', 'geometrySequence']
+
+    path_elements = csv_path.split('/')
+    filename = path_elements[-1]
+    filename_elements = filename.split('.')
+
+    try:
+        table_name = filename_elements[0]
+        if table_name not in validTables:
+            raise Exception
+    except:
+        print('Not a valid table name in the filename')
+        return
+
+    table = Table(table_name, 'coastcamdb', connection)
+    for i, column in enumerate(column_names):
+
+        if column in fk_column_list:
+            table.__dict__[column] = fkColumn(column_name=column, table=table, value=column_values[i])
+
+        elif column == 'id':
+            table.__dict__[column] = idColumn(table=table, value=column_values[i])
+
+        else:
+            table.__dict__[column] = Column(column_name=column, table=table, value=column_values[i])
+
+    table.insertTable2db()
+
+
             
-            for value in dataframe.get(column):
-                column_values.append(value)
-
-            nested_dict[column] = column_values
-        data_dict[table] = nested_dict
-
-        if csv_path != '':
-            site = data_dict['site']['id'][0]
-            filename = table + '.csv'
-            folder_path = csv_path + '/sites/' + site + '/tables/'
-
-            if not os.path.exists(folder_path):
-                os.makedirs(folder_path)
-
-            full_path = folder_path + filename
-            dataframe.to_csv(full_path, encoding='utf-8', index=False)
-    
-    else:
-        print("'scope' argument for store_read_data() must be 'column', 'table', or 'site'")
-
-    return data_dict
-    
+      
          
 ##### CLASSES #####
 class MismatchIDError(Exception):
@@ -1126,6 +1343,8 @@ class Table:
         if len(fk_columns) > 1:
             print('mulitple fk')
 
+            returnSeqListFlag = True
+
             #check value list for all fk columns have the same length
             try:
                 for i in range(0, len(fk_columns)):
@@ -1144,20 +1363,22 @@ class Table:
 
                     fk_args[i][column.column_name] = column.value_list[i]
 
-            if (self.table_name == 'usedgcp') or (self.table_name == 'geometry'):
-                returnSeqListFlag = True
+##            if (self.table_name == 'usedgcp') or (self.table_name == 'geometry'):
+##                returnSeqListFlag = True
 
             seq_list = self.insertMultipleFK(returnSeqListFlag=returnSeqListFlag)
             
         elif len(fk_columns) == 1:
             print('1 fk')
 
+            returnSeqListFlag = True
+
             for i in range(0, len(fk_columns[0].value_list)):
 
                 fk_args.append({fk_columns[0].column_name : fk_columns[0].value_list[i]})
 
-            if (self.table_name == 'usedgcp') or (self.table_name == 'geometry'):
-                returnSeqListFlag = True
+##            if (self.table_name == 'usedgcp') or (self.table_name == 'geometry'):
+##                returnSeqListFlag = True
 
             seq_list = fk_columns[0].insert2db(returnSeqListFlag=returnSeqListFlag)
             
@@ -1180,10 +1401,10 @@ class Table:
         #vvv ADD ALL OTHER COLUMNS vvv#
         if (self.table_name == 'geometry') or (self.table_name == 'usedgcp'):
             for i in range(0, len(other_columns)):
-                other_columns[i].insert2db(fk_args=fk_args)
+                other_columns[i].update2db(seq_list=seq_list)
         else:
             for i in range(0, len(other_columns)):
-                other_columns[i].insert2db(fk_args=fk_args)
+                other_columns[i].update2db(id_list=id_list)
                 
     def disp_db_table(self):
         '''
@@ -1387,8 +1608,6 @@ class Column:
             elif isinstance(fk_value, int):
                 query = "SELECT {} FROM {} WHERE {} = {}".format(fk_column, self.table.table_name, fk_column, fk_value)
                 #ex: select geometrySequence from usedgcp where geometrySequence = 1
-                
-            print(query)
 
             result = pd.read_sql(query, con=self.connection)
             
@@ -1504,184 +1723,6 @@ class Column:
             hasBlankID = True
 
         return hasBlankID
-
-
-    def input_id_seq(self, value):
-        '''
-        Given an existing value in a column, prompt the user to select an id/seq value. There are two modes: 'insert' and 'update'.
-        In 'insert' mode, no value argument is needed and all id/seq values for the table aare displayed to user to select from.
-        In 'update' mode, the value is used in the query to get id/seq associated with that value.
-        Inputs:
-            value (string) - exisitng value in the table used to search the table
-        Outputs:
-            idseq (string or int) - id (string) or seq (int) that the user selects
-        '''
-
-        idseq = ''
-
-        if (self.table.table_name == 'usedgcp') or (self.table.table_name == 'geometry'):
-            key = "seq"
-            #account for NULL values
-            if value == 'None':
-                query = "SELECT seq, {} FROM {} WHERE {} IS NULL".format(self.column_name, self.table.table_name, self.column_name)
-            else:
-                query = "SELECT seq, {} FROM {} WHERE {} = '{}'".format(self.column_name, self.table.table_name, self.column_name, value)
-        else:
-            key = "id"
-            if value == 'None':
-                query = "SELECT id, {} FROM {} WHERE {} IS NULL".format(self.column_name, self.table.table_name, self.column_name)
-            else:
-                query = "SELECT id, {} FROM {} WHERE {} = '{}'".format(self.column_name, self.table.table_name, self.column_name, value)
-
-        result = get_formatted_result(query, self.connection)
-        print("Please enter a {} listed from the values below.".format(key))
-        print("vv  Available options are listed below vv")
-        print(result)
-
-        avail_idseq = []
-        for identifier in result.get(key):
-            avail_idseq.append(str(identifier))
-
-        isGoodIDSeq = False
-        while not isGoodIDSeq:
-            
-            idseq = input("~~~Enter an id/seq value: ")
-
-            if idseq.strip() == 'quit':
-                quit()
-
-            if idseq in avail_idseq:
-                isGoodIDSeq = True
-                #special cases to return seq as int for usedgcp and geometry tables
-                if (self.table.table_name == 'usedgcp') or (self.table.table_name == 'geometry'):
-                    idseq = int(idseq)
-                return idseq
-            else:
-                print("Invalid id/seq value. Please try again.")
-
-
-    def get_fk_args(self):
-        '''
-        Get fk args for this column--used for inserting/updating this column with the command line interface.
-        Inputs:
-            none
-        Outputs:
-            fk_args (list) - list of dictionaries used for foreign key arguments. Each dictionary will correspond to an
-                             id being inserted into the table. Only one key/value of an fk column/value pair per id is actually
-                             needed in each dictionary. The key will be the fk column name and the value will be the column value.
-        '''
-        fk_args = []
-
-        if (self.table.table_name == 'station') or (self.table.table_name == 'gcp'):
-            key = 'siteID'
-
-            try:
-                #if empty foreign key columns, throw error
-                if self.table.table_name == 'station':
-                    query = "SELECT siteID FROM station"
-                else:
-                    query = "SELECT siteID FROM gcp"
-
-                result = pd.read_sql(query, con=self.connection)
-                if result.size == 0:
-                    raise FKError(message="no foreign key values in table '{}'".format(self.table.table_name))
-            except FKError as e:
-                sys.exit(e.message)
-            
-        elif self.table.table_name == 'camera':
-            key = 'stationID'
-
-            try:
-                #check if stationID blank in table
-                query = "SELECT stationID FROM camera"
-                result = pd.read_sql(query, con=self.connection)
-                if result.size == 0:
-                    key = 'cameramodelID'
-
-                    #need to check if cameramodelID is blank too
-                    query = "SELECT cameramodelID FROM camera"
-                    result = pd.read_sql(query, con=self.connection)
-                    if result.size == 0:
-                        key = 'lensmodelID'
-
-                        #need to check if lensmodelID is blank too
-                        query = "SELECT lensmodelID FROM camera"
-                        result = pd.read_sql(query, con=self.connection)
-                        if result.size == 0:
-                            key = 'li_IP'
-
-                            #li_IP is last line of defense. If empty, throw error
-                            query = "SELECT li_IP FROM camera"
-                            result = pd.read_sql(query, con=self.connection)
-                            if result.size == 0:
-                                raise FKError(message="no foreign key values in table 'camera'")
-            except FKError as e:
-                sys.exit(e.message)
-                            
-        elif self.table.table_name == 'geometry':
-            key = 'cameraID'
-
-            try:
-                #if empty foregin key columns, throw error
-                query = "SELECT cameraID FROM geometry"
-                result = pd.read_sql(query, con=self.connection)
-                if result.size == 0:
-                    raise FKError(message="no foreign key values in table 'geometry'")
-            except FKError as e:
-                sys.exit(e.message)
-                
-        elif self.table.table_name == 'usedgcp':
-            key = 'gcpID'
-
-            try:
-                #check if gcpID blank in table
-                query = "SELECT gcpID FROM usedgcp"
-                result = pd.read_sql(query, con=self.connection)
-                if result.size == 0:
-                    key = 'geometrySequence'
-
-                    #need to check if geometrySequence is blank too
-                    query = "SELECT geometrySequence FROM usedgcp"
-                    result = pd.read_sql(query, con=self.connection)
-                    if result.size == 0:
-                        raise FKError(message="no foreign key values in table 'usedgcp'")
-            except FKError as e:
-                sys.exit(e.message)
-
-        #get available foreign key options for user to select
-        query = "SELECT {} FROM {} ".format(key, self.table.table_name)
-        result = get_formatted_result(query, self.connection)
-        result = result.drop_duplicates(subset=key, keep='first')
-        result_str = result.to_string(header=False)
-        print("Please enter a {} listed from the values below.".format(key))
-        print("vv  Available options are listed below vv")
-        print(result_str)
-
-        avail_id = []
-        for ID in result.get(key):
-            avail_id.append(ID)
-
-        isGoodID = False
-        while not isGoodID:
-
-            fk_value = input("~~~Enter a {}: ".format(key))
-
-            if fk_value.strip() == 'quit':
-                quit()
-                
-            if fk_value.strip() in avail_id:
-                isGoodID = True
-                fk_args.append({key : fk_value})
-            else:
-                print('Invalid {}, please try again.\n'.format(key))
-
-        query = "SELECT {} FROM {} WHERE {} = '{}'".format(self.column_name, self.table.table_name, key, fk_value)
-        result = get_formatted_result(query, self.connection)
-        result_str = result.to_string(header=False)
-        print("\nCurrent value(s) in {} for {} where {} = {}".format(self.table.table_name, self.column_name, key, fk_value))
-        print(result_str)
-
-        return fk_args       
 
 
     def check_blank_value(self, idseq):
@@ -1835,7 +1876,8 @@ class Column:
                         if ID == '':
                             hasBlankID = True
                             break
-                        
+
+                    
                     try:
                         #if there's a blank id in the same row as the specified foreign key, update the column in that row insteasd of inserting new row
                         if hasBlankID:
@@ -1878,7 +1920,7 @@ class Column:
         self.value_list = []
         
 
-    def update2db(self, old_value, id_list=[], seq_list=[], fk_args=[], returnSeqListFlag=False):
+    def update2db(self, id_list=[], seq_list=[], fk_args=[], returnSeqListFlag=False):
         '''
         Update a value in for this column in the database. Specify the row using a value for id or seq
         Inserts:
@@ -1903,11 +1945,18 @@ class Column:
                 raise EmptyValueError(message="EmptyValueError: Empty value list for column '{}'".format(self.column_name))
         except Exception as e:
             sys.exit(e.message)
+
+
+        #if column is foreign key, insert using the special subclass function for fk instead
+        if isinstance(self, fkColumn):
+            
+            seq_list = self.insertNewFK(returnSeqListFlag)
+            return seq_list
             
         #if column is id, use subclass function
-        if isinstance(self, idColumn):
-            
-            self.updateID(old_value)
+        elif isinstance(self, idColumn):
+
+            self.insertNewID(fk_args)
 
         else:
 
@@ -2019,7 +2068,6 @@ class Column:
         #clear list once all values have been inserted into DB
         self.value_list = []
 
-
     def valueFromDB(self, id_seq):
         '''
         Retrieve the value of the column from the database given a specfified id or seq value.
@@ -2071,13 +2119,15 @@ class idColumn(Column):
         Column.__init__(self, column_name='id', table=table, value=value)
 
 
-    def insertNewID(self, fk_args = []):
+    def insertNewID(self, fk_args = [], seq_list = []):
         '''
         Insert new id column value(s) into the database. USes foreign keys where necessary.
         Inputs:
             fk_args (list) - list of dictionaries used for foreign key arguments. Each dictionary will correspond to an
                              id being inserted into the table. Only one key/value of an fk column/value pair per id is actually
                              needed in each dictionary. The key will be the fk column name and the value will be the column value.
+            seq_list (list) - list of seq values used to specify which row to insert the id into. Used for cases where multiple
+                              rows in a table have the same foregin key value
         Outputs:
             none
         '''
@@ -2226,11 +2276,6 @@ class fkColumn(Column):
             seq_list (list) - optional output argument that is a list of seq values from the database
         '''
 
-##        #special case for tables with multiple foreign keys
-##        if (self.table.table_name == 'camera') or (self.table.table_name == 'usedgcp'):
-##            self.table.insertMultipleFK()
-##
-##        else:
         seq_list = []
         for value in self.value_list:
 
