@@ -5,8 +5,8 @@ are equivalent to the fields in the Db table
 '''
 
 ##### IMPORTS #####
-import pandas as pd
-import pymysql
+##import pandas as pd
+##import pymysql
 import csv
 import datetime
 import os
@@ -14,11 +14,12 @@ import sys
 import ast
 import random
 import numpy as np
-import mysql.connector
-from mysql.connector import errorcode
-from tabulate import tabulate
+import pytz
+##import mysql.connector
+##from mysql.connector import errorcode
+##from tabulate import tabulate
+import dateutil
 from dateutil import tz
-
 
 
 ##### FUNCTIONS #####
@@ -47,6 +48,65 @@ def parseCSV(filepath):
             i = i + 1
                 
     return db_list
+
+
+def parseFilename(path, noLocal=False, timezone='utc'):
+    '''
+    Parse an Argus-formatted file into component parts. throw away any leading path info.
+    e.g, '887065208.Mon.Feb.09_23:00:08.GMT.1998.argus00.c1.snap.jpg'
+    is parsed into:
+    time    887065208
+    when    Mon.Feb.09_23:00:08.GMT.1998
+    station argus00
+    camera  1
+    type    snap
+    format  jpg
+    localwhen 'Mon.Feb.09_15_00_08.PST.1998'
+    Inputs:
+        path (string) - filename in Argus format. can be filepath.
+        noLocal (boolean) - Flag for determining whether to include localwhen in the
+                            outputted in dictionary. Default False. If true, localwhen
+                            not outputted.
+        timezone (string) - string specifying the user's local time zone
+    Outputs:
+        components (dict) - dictionary of component parts of the filename
+    '''
+
+    path = path.replace('\\', '/')
+    path_elements = path.split('/')
+    filename = path_elements[-1]
+    filename_elements = filename.split('.')
+
+    components = {}
+
+    try:
+        if len(filename_elements) != 10:
+            raise Exception
+
+        components['time'] = filename_elements[0]
+        
+        #combine the date elements
+        when = filename_elements[1] + '.' +  filename_elements[2] + '.' + filename_elements[3] + '.' + filename_elements[4] + '.' + filename_elements[5]
+        components['when'] = when
+
+        components['station'] = filename_elements[6]
+        components['camera'] = filename_elements[7]
+        components['type'] = filename_elements[8]
+        components['format'] = filename_elements[9]
+
+        if noLocal == False:       
+            #convert from UTC to local
+            datetime_str, datetime_obj, tzone = unix2dt(filename_elements[0], timezone=timezone)
+            #formatted argus date with local timezone
+            localwhen = datetime_obj.strftime('%a.%b.%d_%H_%M_%S.%Z.%Y')
+            components['localwhen'] = localwhen
+
+        return components
+        
+    except:
+        print('Error: invalid filename. Filename must follow the Argus format')
+        return
+    
 
 
 def DBConnectCSV(filepath):
