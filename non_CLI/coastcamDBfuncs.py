@@ -14,11 +14,12 @@ import sys
 import ast
 import random
 import numpy as np
+import pytz
 import mysql.connector
 from mysql.connector import errorcode
 from tabulate import tabulate
+import dateutil
 from dateutil import tz
-
 
 
 ##### FUNCTIONS #####
@@ -47,6 +48,65 @@ def parseCSV(filepath):
             i = i + 1
                 
     return db_list
+
+
+def parseFilename(path, noLocal=False, timezone='utc'):
+    '''
+    Parse an Argus-formatted file into component parts. throw away any leading path info.
+    e.g, '887065208.Mon.Feb.09_23:00:08.GMT.1998.argus00.c1.snap.jpg'
+    is parsed into:
+    time    887065208
+    when    Mon.Feb.09_23:00:08.GMT.1998
+    station argus00
+    camera  1
+    type    snap
+    format  jpg
+    localwhen 'Mon.Feb.09_15_00_08.PST.1998'
+    Inputs:
+        path (string) - filename in Argus format. can be filepath.
+        noLocal (boolean) - Flag for determining whether to include localwhen in the
+                            outputted in dictionary. Default False. If true, localwhen
+                            not outputted.
+        timezone (string) - string specifying the user's local time zone
+    Outputs:
+        components (dict) - dictionary of component parts of the filename
+    '''
+
+    path = path.replace('\\', '/')
+    path_elements = path.split('/')
+    filename = path_elements[-1]
+    filename_elements = filename.split('.')
+
+    components = {}
+
+    try:
+        if len(filename_elements) != 10:
+            raise Exception
+
+        components['time'] = filename_elements[0]
+        
+        #combine the date elements
+        when = filename_elements[1] + '.' +  filename_elements[2] + '.' + filename_elements[3] + '.' + filename_elements[4] + '.' + filename_elements[5]
+        components['when'] = when
+
+        components['station'] = filename_elements[6]
+        components['camera'] = filename_elements[7]
+        components['type'] = filename_elements[8]
+        components['format'] = filename_elements[9]
+
+        if noLocal == False:       
+            #convert from UTC to local
+            datetime_str, datetime_obj, tzone = unix2dt(filename_elements[0], timezone=timezone)
+            #formatted argus date with local timezone
+            localwhen = datetime_obj.strftime('%a.%b.%d_%H_%M_%S.%Z.%Y')
+            components['localwhen'] = localwhen
+
+        return components
+        
+    except:
+        print('Error: invalid filename. Filename must follow the Argus format')
+        return
+    
 
 
 def DBConnectCSV(filepath):
@@ -502,7 +562,7 @@ def displaySite(siteID, connection):
 
     return df_list
 
-def getParameterDicts(stationID, unix_time, connection):
+def getParameterDicts(stationID, connection, useUnix=False, unix_time=None):
     '''
     Given a stationID, return parameter dictionaries for extrinsics, intrinsics, metadata, and local origin.
     Extrinsics, intrinsics, and metadata will be stored as lists, where each item in the list is a dictionary of
@@ -510,8 +570,10 @@ def getParameterDicts(stationID, unix_time, connection):
     Inputs:
         stationID (string) - specifies the "id" field for the "station" table, which is also the "stationID" field in the
                              "camera" table
-        unix_time (int) - timestamp of the filename needed for searching relevant data
         connection (pymysql.connections.Connection object) - Object representing connection to DB
+        useUnix (boolean) - flag for specifying if a unix time should be used to narrow the data the user is looking for
+        unix_time (int) - timestamp of the filename needed for searching relevant data
+        
     Outputs:
         extrinsics (list) - list of extrinsic paramater dictionaries. One dictionary for each camera.
         intrinsics (list) - list of intrinsic parameter dictionaries. One dictionary for each camera.
@@ -519,7 +581,15 @@ def getParameterDicts(stationID, unix_time, connection):
         local_origin (dictionary) - dictionary of local origin parameters
     '''
 
-    query = "SELECT * FROM camera WHERE stationID = '{}' AND timeIN <= {} AND timeOUT >= {} ".format(stationID, unix_time, unix_time)
+    #accounting for unix time
+    if useUnix == True:
+        if unix_time != None:
+            query = "SELECT * FROM camera WHERE stationID = '{}' AND timeIN <= {} AND timeOUT >= {} ".format(stationID, unix_time, unix_time)
+        else:
+            query = "SELECT * FROM camera WHERE stationID = '{}'".format(stationID)
+    else:
+        query = "SELECT * FROM camera WHERE stationID = '{}'".format(stationID)
+
     print(query)
 
     result = pd.read_sql(query, con=connection)
@@ -691,7 +761,7 @@ def filename2param(filename, connection, timezone='utc'):
 
                 date_time_str, date_time_obj, tzone = unix2dt(unix_time, timezone=timezone)
 
-                extrinsics, intrinsics, metadata, local_origin = getParameterDicts(stationID, unix_time, connection)
+                extrinsics, intrinsics, metadata, local_origin = getParameterDicts(stationID, connection, useUnix=True, unix_time=unix_time)
 
                 params = Parameter(extrinsics=extrinsics, intrinsics=intrinsics, metadata=metadata, local_origin=local_origin, date_time_obj=date_time_obj, date_time_str=date_time_str, tzone=tzone)
                 return params

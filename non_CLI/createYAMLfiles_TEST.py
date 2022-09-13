@@ -10,36 +10,6 @@ from coastcamDBfuncs import *
 import datetime
 import mysql.connector
 
-##### FUNCTIONS #####
-def DBdict2yaml(dictionary, descriptor_dict, path, file_name):
-    '''
-    Create YAML file from a  dictionary.
-    Inputs:
-        dictionary (dict) - dictionary object used to create YAML file
-        descriptor_dict (dict) - dictionary of descriptors for fields from the DB
-        path (string) - path to directory where YAML files will be saved
-        file_name (string) - filename for the new YAML file, ".yaml" not included
-    Outputs:
-        none, but YAML files are created
-    '''
-
-    #####EDIT THIS CODE TO FIT NEW FUNCTIONALITY
-
-    filepath = path+"/"+file_name+".yaml"
-        
-    with open(filepath, 'w') as file:
-        for field in dictionary:
-            #manually write in YAML formatting. YAML dump sometimes writes out of order
-            file.write(field + ': ' + str(dictionary[field]) + '\n')
-        
-        #leave comments in yaml with text descriptions of the fields
-        #ex. #x - x location of camera
-        for field in dictionary:
-            file.write('#' + field + ' - ' + descriptor_dict[field]+ '\n')
-
-    return
-
-
 
 ##### MAIN #####
 if __name__ == "__main__":
