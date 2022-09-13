@@ -42,6 +42,7 @@ def createYAMLfiles(stationID, output_path, connection):
         none (but YAML files are created)
     '''
 
+    print(stationID, 'heyo')
     extrinsics, intrinsics, metadata, local_origin = getParameterDicts(stationID, connection)
 
     query = "SELECT * FROM camera WHERE stationID = '{}'".format(stationID)
