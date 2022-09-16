@@ -1328,7 +1328,7 @@ class Table:
 
                 #check value of each foreign key
                 for j in range(0, len(fkColumns[i].valueList)):
-                    linkedTable = fkColumns[i].get_linkedTable(fkColumns[i].columnName)
+                    linkedTable = fkColumns[i].getLinkedTable(fkColumns[i].columnName)
                     
                     #special case: check that geometrySequence matches a seq value in geometry table. If not, set geometrySequence to most recently inserted seq value in geometry.
                     #this is because seq auto increments for each new insertion in geometry
@@ -1375,19 +1375,19 @@ class Table:
 
             #can only insert one fk for per row with blank id value, so check for blank id and create placeholder id
             if self.tableName != 'usedgcp':
-                hasBlankID = fkColumns[0].check_for_blank_id()
+                hasBlankID = fkColumns[0].check4BlankID()
             
             if hasBlankID:
 
-                placeholder_id = str(random.randint(0, 9999999))
-                isDuplicate = fkColumns[0].checkDuplicateId(placeholder_id)
+                placeholderId = str(random.randint(0, 9999999))
+                isDuplicate = fkColumns[0].checkDuplicateId(placeholderId)
                 
                 while isDuplicate:
-                    placeholder_id = str(random.randint(0, 9999999))
-                    isDuplicate = fkColumns[0].checkDuplicateId(placeholder_id)
+                    placeholderId = str(random.randint(0, 9999999))
+                    isDuplicate = fkColumns[0].checkDuplicateId(placeholderId)
 
                 #insert placeholder so there's no error for having blank id values when inserting fk
-                query = "UPDATE {} SET id = '{}' WHERE id = ''".format(self.tableName, placeholder_id)
+                query = "UPDATE {} SET id = '{}' WHERE id = ''".format(self.tableName, placeholderId)
 
                 print(query)
                 cursor = self.connection.cursor()
@@ -1435,7 +1435,7 @@ class Table:
         
         fkColumns = []
         id_column = None
-        other_columns = []
+        otherColumns = []
         for column in self.__dict__:
 
             if isinstance(self.__dict__[column], fkColumn):
@@ -1445,10 +1445,10 @@ class Table:
                 id_column = self.__dict__[column]
 
             elif isinstance(self.__dict__[column], Column):
-                other_columns.append(self.__dict__[column])
+                otherColumns.append(self.__dict__[column])
 
         #vvv ADD FOREIGN KEY(S) TO TABLE vvv#
-        fk_args = []
+        fkArgs = []
         returnSeqListFlag = False
         seqList = []
         if len(fkColumns) > 1:
@@ -1467,12 +1467,12 @@ class Table:
                 
             for i in range(0, len(fkColumns[0].valueList)):
 
-                fk_dict = {}
-                fk_args.append(fk_dict)
+                fkDict = {}
+                fkArgs.append(fkDict)
                 
                 for column in fkColumns:
 
-                    fk_args[i][column.columnName] = column.valueList[i]
+                    fkArgs[i][column.columnName] = column.valueList[i]
 
 ##            if (self.tableName == 'usedgcp') or (self.tableName == 'geometry'):
 ##                returnSeqListFlag = True
@@ -1486,7 +1486,7 @@ class Table:
 
             for i in range(0, len(fkColumns[0].valueList)):
 
-                fk_args.append({fkColumns[0].columnName : fkColumns[0].valueList[i]})
+                fkArgs.append({fkColumns[0].columnName : fkColumns[0].valueList[i]})
 
 ##            if (self.tableName == 'usedgcp') or (self.tableName == 'geometry'):
 ##                returnSeqListFlag = True
@@ -1502,8 +1502,8 @@ class Table:
         #vvv ADD ID TO TABLE vvv#
         if id_column != None:
             print('has id column')
-            id_list = id_column.valueList
-            id_column.insert2db(fk_args=fk_args)
+            idList = id_column.valueList
+            id_column.insert2db(fkArgs=fkArgs)
 
         else:
             print('no id column')
@@ -1511,13 +1511,13 @@ class Table:
 
         #vvv ADD ALL OTHER COLUMNS vvv#
         if (self.tableName == 'geometry') or (self.tableName == 'usedgcp'):
-            for i in range(0, len(other_columns)):
-                other_columns[i].update2db(seqList=seqList)
+            for i in range(0, len(otherColumns)):
+                otherColumns[i].update2db(seqList=seqList)
         else:
-            for i in range(0, len(other_columns)):
-                other_columns[i].update2db(id_list=id_list)
+            for i in range(0, len(otherColumns)):
+                otherColumns[i].update2db(idList=idList)
                 
-    def disp_db_table(self):
+    def dispDBTable(self):
         '''
         Query the database and display all rows for the associated table
         '''
@@ -1530,27 +1530,27 @@ class Table:
         with pd.option_context('display.max_rows', None, 'display.max_columns', None):  # more options can be specified also
             print(df)
 
-    def tableFromDB(self, id_seq):
+    def tableFromDB(self, idSeq):
         '''
         Retrieve all columns in a row in a table given a unique id/seq. Return as a dictionary object.
         Inputs:
-            id_seq (string or int) - id (string) or seq (int) value used to specify which row of the column to get the value from.
+            idSeq (string or int) - id (string) or seq (int) value used to specify which row of the column to get the value from.
         Outputs:
-            value_dict (dict) - dictonary of values retrieved from the row in the table. The key is column name, the value is the column
+            valueDict (dict) - dictonary of values retrieved from the row in the table. The key is column name, the value is the column
                                 value.
         '''
 
-        column_list = []
+        columnList = []
         for column in self.__dict__:
             if isinstance(self.__dict__[column], Column):
-                column_list.append(self.__dict__[column])
+                columnList.append(self.__dict__[column])
 
-        value_dict = {}
-        for column in column_list:
-            value = column.valueFromDB(id_seq)
-            value_dict[column.columnName] = value
+        valueDict = {}
+        for column in columnList:
+            value = column.valueFromDB(idSeq)
+            valueDict[column.columnName] = value
 
-        return value_dict
+        return valueDict
         
 
 class Column:
@@ -1566,7 +1566,7 @@ class Column:
     the fk geometrySequence in the 'usedgcp' table, which links to the 'seq' column in the 'geometry' table. If the
     table has multiple foreign keys, the value will be a list of tuples with one tuple per fk.
     '''
-    fk_dict = {'station': ('site', 'siteID'),
+    fkDict = {'station': ('site', 'siteID'),
                'camera': [('station', 'stationID'), ('cameramodel', 'modelID'), ('lensmodel', 'lensmodelID'), ('ip', 'li_IP')],
                'geometry': ('camera', 'cameraID'),
                'gcp': ('site', 'siteID'),
@@ -1615,7 +1615,7 @@ class Column:
         else:
             self.valueList.append(value)
 
-    def check_list_length(self, idseqList):
+    def checkListLength(self, idseqList):
         '''
         Check to make sure that the length of the list of ids or seqs is the same length as the value list of this Column object.
         Raise exception if the number of given id/seq values to insert into table isn't the same as the number of values to insert
@@ -1632,7 +1632,7 @@ class Column:
         except Exception as e:
             sys.exit(e.message)
 
-    def get_foreign_key(self):
+    def getForeignKey(self):
         '''
         Return the foreign key(s) associated with this column in the database
         Inputs:
@@ -1644,14 +1644,14 @@ class Column:
                                                      If theere are multiple foregin keys, this method returns a list of tuples.
         '''
         try:
-            return self.fk_dict[self.table.tableName]
+            return self.fkDict[self.table.tableName]
         
         except Exception:
             print("No foreign keys for table '{}'".format(self.table.tableName))
             return ''
             
 
-    def get_linkedTable(self, fk_column):
+    def getLinkedTable(self, fk_column):
         '''
         Return the name of a foreign key (fk), return the name of the table that the fk links to.
         Inputs:
@@ -1693,16 +1693,16 @@ class Column:
                 linkedTable = 'geometry'
 
         else:
-            linkedTable = self.fk_dict[self.table.tableName][0]
+            linkedTable = self.fkDict[self.table.tableName][0]
 
         return linkedTable
 
-    def check_foreign_key(self, fk_column, fk_value):
+    def checkForeignKey(self, fk_column, fkValue):
         '''
         Check that the foreign key is valid and exists in the same table as this column
         Inputs:
-            fk_column (string) - name of the foregin key column to be checked
-            fk_value (string or int) - id/seq value of the foreign key
+            fk_column (string) - name of the foreign key column to be checked
+            fkValue (string or int) - id/seq value of the foreign key
         Outputs:
             none
         '''
@@ -1712,45 +1712,45 @@ class Column:
             if fk_column not in self.fkColumnList:
                 raise FKError("FKError: invalid foreign key '{}'".format(fk_column))
 
-            if isinstance(fk_value, str):
-                query = "SELECT {} FROM {} WHERE {} = '{}'".format(fk_column, self.table.tableName, fk_column, fk_value)
+            if isinstance(fkValue, str):
+                query = "SELECT {} FROM {} WHERE {} = '{}'".format(fk_column, self.table.tableName, fk_column, fkValue)
                 #ex: select modelID from camera where modelID = 'XXXXX'
 
-            elif isinstance(fk_value, int):
-                query = "SELECT {} FROM {} WHERE {} = {}".format(fk_column, self.table.tableName, fk_column, fk_value)
+            elif isinstance(fkValue, int):
+                query = "SELECT {} FROM {} WHERE {} = {}".format(fk_column, self.table.tableName, fk_column, fkValue)
                 #ex: select geometrySequence from usedgcp where geometrySequence = 1
 
             result = pd.read_sql(query, con=self.connection)
             
             #NULL return, no seq/id found
             if result.size == 0:
-                raise NoIDError("NoSeqError: No foreign_key '{}' with value '{}' found in table '{}'".format(fk_column, fk_value, self.table.tableName))
+                raise NoIDError("NoSeqError: No foreign_key '{}' with value '{}' found in table '{}'".format(fk_column, fkValue, self.table.tableName))
             
         except Exception as e:
             sys.exit(e.message)
 
 
-    def fk_from_id(self, ID):
+    def fkFromId(self, ID):
         '''
         Given an ID value in a database table, find the corresponding foreign key value (same row).
         Inputs:
             ID (string) - id column value
         Outputs:
             fk_column (string) - name of the foreign key column in the table
-            fk_value (string) - foreign key value for corresponding id
+            fkValue (string) - foreign key value for corresponding id
         '''
 
-        fk_pair = self.get_foreign_key()
+        fkPair = self.getForeignKey()
 
-        #for tables that have multiple fk columns, fk_pair is a list of tuples
-        if isinstance(fk_pair, list):
+        #for tables that have multiple fk columns, fkPair is a list of tuples
+        if isinstance(fkPair, list):
             #only need 1 fk value  for purposes of inserting values into database
-            fk_column = fk_pair[0][1]
+            fk_column = fkPair[0][1]
 
-        #table only has 1 foreign key column, fk_pair is a tuple
+        #table only has 1 foreign key column, fkPair is a tuple
         else:
-            print(fk_pair)
-            fk_column = fk_pair[1]
+            print(fkPair)
+            fk_column = fkPair[1]
             
         checkID(ID, self.table.tableName, self.connection)
         
@@ -1758,30 +1758,30 @@ class Column:
         print(query)
 
         result = pd.read_sql(query, con=self.connection)
-        fk_value = result.get(fk_column)[0]
-        return fk_column, fk_value
+        fkValue = result.get(fk_column)[0]
+        return fk_column, fkValue
     
 
-    def fk_from_seq(self, seq):
+    def fkFromSeq(self, seq):
         '''
         Given a seq value in a database table, find the corresponding foreign key value (same row).
         Inputs:
             seq (int) - seq column value
         Outputs:
             fk_column (string) - name of the foreign key column in the table
-            fk_value (int) - foreign key value for corresponding seq
+            fkValue (int) - foreign key value for corresponding seq
         '''
 
-        fk_pair = self.get_foreign_key()
+        fkPair = self.getForeignKey()
 
-        #for tables that have multiple fk columns, fk_pair is a list of tuples
-        if isinstance(fk_pair, list):
+        #for tables that have multiple fk columns, fkPair is a list of tuples
+        if isinstance(fkPair, list):
             #only need 1 fk value  for purposes of inserting values into database
-            fk_column = fk_pair[0][1]
+            fk_column = fkPair[0][1]
 
-        #table only has 1 foreign key column, fk_pair is a tuple
+        #table only has 1 foreign key column, fkPair is a tuple
         else:
-            fk_column = fk_pair[1]
+            fk_column = fkPair[1]
             
         checkSeq(seq, self.table.tableName, self.connection)
         
@@ -1789,8 +1789,8 @@ class Column:
         print(query)
 
         result = pd.read_sql(query, con=self.connection)
-        fk_value = result.get(fk_column)[0]
-        return fk_column, fk_value
+        fkValue = result.get(fk_column)[0]
+        return fk_column, fkValue
     
 
     def checkDuplicateId(self, ID):
@@ -1814,7 +1814,7 @@ class Column:
         return isDuplicate
     
 
-    def check_for_blank_id(self):
+    def check4BlankID(self):
         '''
         Check if any rows in the column's associated table have a blank id value. Used for inserting new foreign keys.
         Can only have one blank id per table or else inserting a new fk will fail.
@@ -1836,7 +1836,7 @@ class Column:
         return hasBlankID
 
 
-    def check_blank_value(self, idseq):
+    def checkBlankValue(self, idseq):
         '''
         Given an id/seq value, check if the value is blank for this column for the given row.
         Inputs:
@@ -1861,11 +1861,11 @@ class Column:
         return hasBlankValue
 
 
-    def insert2db(self, fk_args=[], returnSeqListFlag=False):
+    def insert2db(self, fkArgs=[], returnSeqListFlag=False):
         '''
         insert new value into for this column into the database. Depending on the table, specify a foreign key
         Inserts:
-            fk_args (list) - list of dictionaries used for foreign key arguments. Used when this function calls insertNewID().
+            fkArgs (list) - list of dictionaries used for foreign key arguments. Used when this function calls insertNewID().
             returnSeqListFlag (boolean) - Optional argument specifying whether or not the function will return a seqList. This
                                           seqList is a list of seq values from the database associated with each new foreign key
                                           inserted into the database
@@ -1890,11 +1890,11 @@ class Column:
         #if column is id, use subclass function
         elif isinstance(self, idColumn):
 
-            self.insertNewID(fk_args)
+            self.insertNewID(fkArgs)
 
         else:
 
-            fk = self.get_foreign_key()
+            fk = self.getForeignKey()
 
             #does not need foreign key
             if fk == '':
@@ -1929,9 +1929,9 @@ class Column:
 
                 for i, value in enumerate(self.valueList):
 
-                    for dict_key, dict_value in fk_args[i].items():
-                        fk_column = dict_key
-                        fk_value = dict_value
+                    for dictKey, dictValue in fkArgs[i].items():
+                        fk_column = dictKey
+                        fkValue = dictValue
 
                     #don't need to check for blank id. Seq updates automatically with everynew insertion
 
@@ -1942,18 +1942,18 @@ class Column:
                     elif fk_column == 'cameraID':
                         linkedTable = 'camera'
 
-                    checkLinkedKey(fk_value, fk_column, linkedTable, self.connection)
+                    checkLinkedKey(fkValue, fk_column, linkedTable, self.connection)
                     
                     try:
                         if isinstance(value, str):
-                            query = "INSERT INTO {} ({}, {}) VALUES ('{}', '{}')".format(self.table.tableName, fk_column, self.columnName, fk_value, value)
+                            query = "INSERT INTO {} ({}, {}) VALUES ('{}', '{}')".format(self.table.tableName, fk_column, self.columnName, fkValue, value)
 
                         elif isinstance(value, int) or isinstance(value, float):
-                            query = "INSERT INTO {} ({}, {}) VALUES ('{}', {})".format(self.table.tableName, fk_column, self.columnName, fk_value, value)
+                            query = "INSERT INTO {} ({}, {}) VALUES ('{}', {})".format(self.table.tableName, fk_column, self.columnName, fkValue, value)
 
                         elif isinstance(value, np.ndarray):
                             blob = np2text(value)
-                            query = query = "INSERT INTO {} ({}, {}) VALUES ('{}', '{}')".format(self.table.tableName, fk_column, self.columnName, fk_value, blob)
+                            query = query = "INSERT INTO {} ({}, {}) VALUES ('{}', '{}')".format(self.table.tableName, fk_column, self.columnName, fkValue, blob)
                         
                         else:
                             raise TypeError
@@ -1975,12 +1975,12 @@ class Column:
 
                 for i, value in enumerate(self.valueList):
 
-                    for dict_key, dict_value in fk_args[i].items():
-                        fk_column = dict_key
-                        fk_value = dict_value
+                    for dictKey, dictValue in fkArgs[i].items():
+                        fk_column = dictKey
+                        fkValue = dictValue
 
                     #check for blank ID correpsonding to fk arg
-                    query = "SELECT id FROM {} WHERE {} = '{}'".format(self.table.tableName, fk_column, fk_value)
+                    query = "SELECT id FROM {} WHERE {} = '{}'".format(self.table.tableName, fk_column, fkValue)
                     result = pd.read_sql(query, con=self.connection)
                     hasBlankID = False
                     for ID in result.get('id'):
@@ -1993,24 +1993,24 @@ class Column:
                         #if there's a blank id in the same row as the specified foreign key, update the column in that row insteasd of inserting new row
                         if hasBlankID:
                             if isinstance(value, str):
-                                query = "UPDATE {} SET {} = '{}' WHERE {} = '{}' AND id = ''".format(self.table.tableName, self.columnName, value, fk_column, fk_value)
+                                query = "UPDATE {} SET {} = '{}' WHERE {} = '{}' AND id = ''".format(self.table.tableName, self.columnName, value, fk_column, fkValue)
                             elif isinstance(value, int) or isinstance(value, float):
-                                query = "UPDATE {} SET {} = {} WHERE {} = '{}' AND id = ''".format(self.table.tableName, self.columnName, value, fk_column, fk_value)
+                                query = "UPDATE {} SET {} = {} WHERE {} = '{}' AND id = ''".format(self.table.tableName, self.columnName, value, fk_column, fkValue)
                             elif isinstance(value, np.ndarray):
                                 blob = np2text(value)
-                                query = query = "UPDATE {} SET {} = '{}' WHERE {} = '{}' AND id = ''".format(self.table.tableName, self.columnName, blob, fk_column, fk_value)
+                                query = query = "UPDATE {} SET {} = '{}' WHERE {} = '{}' AND id = ''".format(self.table.tableName, self.columnName, blob, fk_column, fkValue)
                             else:
                                 raise TypeError
                         else:
                             if isinstance(value, str):
-                                query = "INSERT INTO {} ({}, {}) VALUES ('{}', '{}')".format(self.table.tableName, fk_column, self.columnName, fk_value, value)
+                                query = "INSERT INTO {} ({}, {}) VALUES ('{}', '{}')".format(self.table.tableName, fk_column, self.columnName, fkValue, value)
 
                             elif isinstance(value, int) or isinstance(value, float):
-                                query = "INSERT INTO {} ({}, {}) VALUES ('{}', {})".format(self.table.tableName, fk_column, self.columnName, fk_value, value)
+                                query = "INSERT INTO {} ({}, {}) VALUES ('{}', {})".format(self.table.tableName, fk_column, self.columnName, fkValue, value)
 
                             elif isinstance(value, np.ndarray):
                                 blob = np2text(value)
-                                query = "INSERT INTO {} ({}, {') VALUES ('{}', '{}')".format(self.table.tableName, fk_column, self.columnName, fk_value, blob)
+                                query = "INSERT INTO {} ({}, {') VALUES ('{}', '{}')".format(self.table.tableName, fk_column, self.columnName, fkValue, blob)
                             
                             else:
                                 raise TypeError
@@ -2031,18 +2031,18 @@ class Column:
         self.valueList = []
         
 
-    def update2db(self, id_list=[], seqList=[], fk_args=[], returnSeqListFlag=False):
+    def update2db(self, idList=[], seqList=[], fkArgs=[], returnSeqListFlag=False):
         '''
         Update a value in for this column in the database. Specify the row using a value for id or seq
         Inserts:
-            id_list (list) - list of id (string) values. Used if there are multiple values in self.valueList to be inserted.
+            idList (list) - list of id (string) values. Used if there are multiple values in self.valueList to be inserted.
                              The id values are used for specifying specifying the id(s) of the associated row(s) in the DB that the value(s)
                              will be inserted into. Used with the SQL 'WHERE' clause
             seqList  (list) - list of seq (int) values. Used if there are multiple values in self.valueList to be inserted.
                                The id values are used for specifying specifying the seq(s) of the associated row(s) in the DB that the value(s)
                                will be inserted into. Used with the SQL 'WHERE' clause. seq column only used with the geometry and
                                usedgcp tables.
-            fk_args (list) - list of dictionaries used for foreign key arguments. Used when this function calls insertNewID().
+            fkArgs (list) - list of dictionaries used for foreign key arguments. Used when this function calls insertNewID().
             returnSeqListFlag (boolean) - Optional argument specifying whether or not the function will return a seqList. This
                                           seqList is a list of seq values from the database associated with each new foreign key
                                           inserted into the database
@@ -2067,26 +2067,26 @@ class Column:
         #if column is id, use subclass function
         elif isinstance(self, idColumn):
 
-            self.insertNewID(fk_args)
+            self.insertNewID(fkArgs)
 
         else:
 
-            fk = self.get_foreign_key()
+            fk = self.getForeignKey()
             
             if fk == '':
                 #does not need foreign key
-                self.check_list_length(id_list)
+                self.checkListLength(idList)
 
                 for i, value in enumerate(self.valueList):
 
-                    checkID(id_list[i], self.table.tableName, self.connection)
+                    checkID(idList[i], self.table.tableName, self.connection)
                     
                     try:
                         if isinstance(value, str):
-                            query = "UPDATE {} SET {} = '{}' WHERE id = '{}'".format(self.table.tableName, self.columnName, value, id_list[i])
+                            query = "UPDATE {} SET {} = '{}' WHERE id = '{}'".format(self.table.tableName, self.columnName, value, idList[i])
 
                         elif isinstance(value, int) or isinstance(value, float):
-                            query = "UPDATE {} SET {} = {} WHERE id = '{}'".format(self.table.tableName, self.columnName, value, id_list[i])
+                            query = "UPDATE {} SET {} = {} WHERE id = '{}'".format(self.table.tableName, self.columnName, value, idList[i])
 
                         else:
                             raise TypeError
@@ -2106,23 +2106,23 @@ class Column:
             #tables that use seq instead of id            
             elif (self.table.tableName == 'usedgcp') or (self.table.tableName == 'geometry'):                    
 
-                self.check_list_length(seqList)
+                self.checkListLength(seqList)
 
                 for i, value in enumerate(self.valueList):
 
-                    #don't need to checkSeq because that is already done in fk_from_seq
-                    fk_column, fk_value = self.fk_from_seq(seqList[i])
+                    #don't need to checkSeq because that is already done in fkFromSeq
+                    fk_column, fkValue = self.fkFromSeq(seqList[i])
                     
                     try:
                         if isinstance(value, str):
-                            query = "UPDATE {} SET {} = '{}' WHERE {} = '{}' and seq = {}".format(self.table.tableName, self.columnName, value, fk_column, fk_value, seqList[i])
+                            query = "UPDATE {} SET {} = '{}' WHERE {} = '{}' and seq = {}".format(self.table.tableName, self.columnName, value, fk_column, fkValue, seqList[i])
 
                         elif isinstance(value, int) or isinstance(value, float):
-                            query = "UPDATE {} SET {} = {} WHERE {} = '{}' and seq  = {}".format(self.table.tableName, self.columnName, value, fk_column, fk_value, seqList[i])
+                            query = "UPDATE {} SET {} = {} WHERE {} = '{}' and seq  = {}".format(self.table.tableName, self.columnName, value, fk_column, fkValue, seqList[i])
 
                         elif isinstance(value, np.ndarray):
                             blob = np2text(value)
-                            query = query = "UPDATE {} SET {} = '{}' WHERE {} = '{}' and seq = {}".format(self.table.tableName, self.columnName, blob, fk_column, fk_value, seqList[i])
+                            query = query = "UPDATE {} SET {} = '{}' WHERE {} = '{}' and seq = {}".format(self.table.tableName, self.columnName, blob, fk_column, fkValue, seqList[i])
                         
                         else:
                             raise TypeError
@@ -2142,23 +2142,23 @@ class Column:
             #tables that use id
             else:
 
-                self.check_list_length(id_list)
+                self.checkListLength(idList)
 
                 for i, value in enumerate(self.valueList):
 
-                    #don't need to checkSeq because that is already done in fk_from_seq
-                    fk_column, fk_value = self.fk_from_id(id_list[i])
+                    #don't need to checkSeq because that is already done in fkFromSeq
+                    fk_column, fkValue = self.fkFromId(idList[i])
                     
                     try:
                         if isinstance(value, str):
-                            query = "UPDATE {} SET {} = '{}' WHERE {} = '{}' and id = '{}'".format(self.table.tableName, self.columnName, value, fk_column, fk_value, id_list[i])
+                            query = "UPDATE {} SET {} = '{}' WHERE {} = '{}' and id = '{}'".format(self.table.tableName, self.columnName, value, fk_column, fkValue, idList[i])
 
                         elif isinstance(value, int) or isinstance(value, float):
-                            query = "UPDATE {} SET {} = {} WHERE {} = '{}' and id = '{}'".format(self.table.tableName, self.columnName, value, fk_column, fk_value, id_list[i])
+                            query = "UPDATE {} SET {} = {} WHERE {} = '{}' and id = '{}'".format(self.table.tableName, self.columnName, value, fk_column, fkValue, idList[i])
 
                         elif isinstance(value, np.ndarray):
                             blob = np2text(value)
-                            query = query = "UPDATE {} SET {} = '{}' WHERE {} = '{}' and id = '{}'".format(self.table.tableName, self.columnName, blob, fk_column, fk_value, id_list[i])
+                            query = query = "UPDATE {} SET {} = '{}' WHERE {} = '{}' and id = '{}'".format(self.table.tableName, self.columnName, blob, fk_column, fkValue, idList[i])
                         
                         else:
                             raise TypeError
@@ -2179,31 +2179,31 @@ class Column:
         #clear list once all values have been inserted into DB
         self.valueList = []
 
-    def valueFromDB(self, id_seq):
+    def valueFromDB(self, idSeq):
         '''
         Retrieve the value of the column from the database given a specfified id or seq value.
         Inputs:
-            id_seq (string or int) - id (string) or seq (int) value used to specify which row of the column to get the value from.
+            idSeq (string or int) - id (string) or seq (int) value used to specify which row of the column to get the value from.
         Outputs:
             value (object) - value of the given column in the same row as the specified id/seq. Value type depends on the value
                              type in the database. Can be string, int, double.
         '''
 
         if (self.columnName == 'K') or (self.columnName == 'm') or (self.columnName == 'kc'):
-            if isinstance(id_seq, str):
-                result = db2np(connection=self.connection, table=self.table.tableName, column=self.columnName, ID=id_seq)
+            if isinstance(idSeq, str):
+                result = db2np(connection=self.connection, table=self.table.tableName, column=self.columnName, ID=idSeq)
 
-            elif isinstance(id_seq, int):
-                result = db2np(connection=self.connection, table=self.table.tableName, column=self.columnName, seq=id_seq)
+            elif isinstance(idSeq, int):
+                result = db2np(connection=self.connection, table=self.table.tableName, column=self.columnName, seq=idSeq)
 
         else:
-            if isinstance(id_seq, str):   
-                checkID(id_seq, self.table.tableName, self.connection)
-                query = "SELECT {} FROM {} WHERE id = '{}'".format(self.columnName, self.table.tableName, id_seq)
+            if isinstance(idSeq, str):   
+                checkID(idSeq, self.table.tableName, self.connection)
+                query = "SELECT {} FROM {} WHERE id = '{}'".format(self.columnName, self.table.tableName, idSeq)
 
-            elif isinstance(id_seq, int):
-                checkSeq(id_seq, self.table.tableName, self.connection)
-                query = "SELECT {} FROM {} WHERE seq = {}".format(self.columnName, self.table.tableName, id_seq)
+            elif isinstance(idSeq, int):
+                checkSeq(idSeq, self.table.tableName, self.connection)
+                query = "SELECT {} FROM {} WHERE seq = {}".format(self.columnName, self.table.tableName, idSeq)
 
             result = pd.read_sql(query, con=self.connection)
             result = result.get(self.columnName)[0]
@@ -2230,11 +2230,11 @@ class idColumn(Column):
         Column.__init__(self, columnName='id', table=table, value=value)
 
 
-    def insertNewID(self, fk_args = [], seqList = []):
+    def insertNewID(self, fkArgs = [], seqList = []):
         '''
         Insert new id column value(s) into the database. USes foreign keys where necessary.
         Inputs:
-            fk_args (list) - list of dictionaries used for foreign key arguments. Each dictionary will correspond to an
+            fkArgs (list) - list of dictionaries used for foreign key arguments. Each dictionary will correspond to an
                              id being inserted into the table. Only one key/value of an fk column/value pair per id is actually
                              needed in each dictionary. The key will be the fk column name and the value will be the column value.
             seqList (list) - list of seq values used to specify which row to insert the id into. Used for cases where multiple
@@ -2243,16 +2243,16 @@ class idColumn(Column):
             none
         '''
 
-        fk = self.get_foreign_key()
+        fk = self.getForeignKey()
             
         if fk != '':
             #needs foreign key
 
             try:
-                if len(fk_args) == 0:
+                if len(fkArgs) == 0:
                     raise FKError("FKError: foreign keys required but no foreign keys passed as arguments")
 
-                elif len(fk_args) != len(self.valueList):
+                elif len(fkArgs) != len(self.valueList):
                     raise FKError("FKError: Incorrect number of foreign keys for number of values to be inserted")
 
             except Exception as e:
@@ -2267,18 +2267,18 @@ class idColumn(Column):
                 print("Duplicate id value. Value not inserted.")
 
             else:
-                if len(fk_args) > 0:
-                    fks = fk_args[i]
+                if len(fkArgs) > 0:
+                    fks = fkArgs[i]
 
                     for fk_column in fks:
                         #check for valid foreign key value. Don't need to check linked table because foreign key in table
                         #already needs to have same value as id/seq in linked table
                         value = fks[fk_column]
-                        self.check_foreign_key(fk_column, value)
+                        self.checkForeignKey(fk_column, value)
 
                     #If function makes it here, foreign keys/values don't throw errors. Only need one fk for query   
-                    #check for blank id. If blank ID, replace with blankid (that has same fk_args) instead of insertiung new value
-                    hasBlankID = self.check_for_blank_id()
+                    #check for blank id. If blank ID, replace with blankid (that has same fkArgs) instead of insertiung new value
+                    hasBlankID = self.check4BlankID()
                     if hasBlankID:
                         query = "UPDATE {} SET id = '{}' WHERE {} = '{}' and id = ''".format(self.table.tableName, ID, fk_column, fks[fk_column])
                         #ex: "UPDATE camera SET id = '1234567' WHERE stationID = '1234567' and id = ''
@@ -2301,11 +2301,11 @@ class idColumn(Column):
             i = i + 1
             
 
-    def updateID(self, old_id):
+    def updateID(self, oldID):
         '''
         Update exsiting id column value in the database. Uses foregin keys where necessary.
         Inputs:
-            old_id (string) - old id value to be updated (replaced)
+            oldID (string) - old id value to be updated (replaced)
         Outputs:
             none
         '''
@@ -2319,7 +2319,7 @@ class idColumn(Column):
                 print("Duplicate id value. Value not updated.")
 
             else:
-                query = "UPDATE {} SET id = '{}' WHERE id = '{}'".format(self.table.tableName, ID, old_id)
+                query = "UPDATE {} SET id = '{}' WHERE id = '{}'".format(self.table.tableName, ID, oldID)
                 #ex: "UPDATE camera SET id = 'yyyyy' WHERE id = 'xxxxx'"
                     
                 print(query)     
@@ -2352,10 +2352,10 @@ class fkColumn(Column):
         Column.__init__(self, columnName=columnName, table=table, value=value)
 
         #assign variable saying what table this fk links to
-        linkedTable = self.get_linkedTable(columnName)
+        linkedTable = self.getLinkedTable(columnName)
         self.linkedTable = linkedTable
 
-    def display_linked_key(self):
+    def displayLinkedKey(self):
         '''
         Display the values for the corresponding id/seq column in this Column's linked table
         Inputs:
@@ -2392,19 +2392,19 @@ class fkColumn(Column):
 
             #can only insert one fk for per row with blank id value, so check for blank id and create placeholder id
             if (self.table.tableName != 'geometry') and (self.table.tableName != 'usedgcp'):
-                hasBlankID = self.check_for_blank_id()
+                hasBlankID = self.check4BlankID()
 
                 if hasBlankID:
 
-                    placeholder_id = str(random.randint(0, 9999999))
-                    isDuplicate = self.checkDuplicateId(placeholder_id)
+                    placeholderId = str(random.randint(0, 9999999))
+                    isDuplicate = self.checkDuplicateId(placeholderId)
                     
                     while isDuplicate:
-                        placeholder_id = str(random.randint(0, 9999999))
-                        isDuplicate = self.checkDuplicateId(placeholder_id)
+                        placeholderId = str(random.randint(0, 9999999))
+                        isDuplicate = self.checkDuplicateId(placeholderId)
 
                     #insert placeholder so there's no error for having blank id values when inserting fk
-                    query = "UPDATE {} SET id = '{}' WHERE id = ''".format(self.table.tableName, placeholder_id)
+                    query = "UPDATE {} SET id = '{}' WHERE id = ''".format(self.table.tableName, placeholderId)
 
                     print(query)
                     cursor = self.connection.cursor()

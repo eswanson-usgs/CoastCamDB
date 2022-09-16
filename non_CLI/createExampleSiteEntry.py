@@ -11,12 +11,12 @@ from mysql.connector import errorcode
 ##### MAIN ######
 #connect to db
 filepath = "C:/Users/eswanson/OneDrive - DOI/Documents/Python/db_access.csv"
-csv_parameters = parseCSV(filepath)
-host = csv_parameters[0]
-port = int(csv_parameters[1])
-dbname = csv_parameters[2]
-user = csv_parameters[3]
-password = csv_parameters[4]
+csvParameters = parseCSV(filepath)
+host = csvParameters[0]
+port = int(csvParameters[1])
+dbname = csvParameters[2]
+user = csvParameters[3]
+password = csvParameters[4]
 connection = pymysql.connect(host=host, user=user, port=port, passwd=password, db=dbname)
 
 exampleSite = Site('Example Site', 'coastcamdb', connection=connection)
@@ -72,7 +72,7 @@ exampleSite.station = Table('station', 'coastcamdb', site=exampleSite, connectio
 exampleSite.station.id  =  idColumn(value='7654321', table=exampleSite.station)
 exampleSite.station.shortName  = Column('shortName', value='examplexx', table=exampleSite.station)
 exampleSite.station.name  =  Column('name', value='example site station', table=exampleSite.station)
-exampleSite.station.siteID = fkColumn('siteID', value=exampleSite.site.id.value_list[0], table=exampleSite.station)
+exampleSite.station.siteID = fkColumn('siteID', value=exampleSite.site.id.valueList[0], table=exampleSite.station)
 exampleSite.station.stationID = Column('stationID', value='EXSTATX', table=exampleSite.station)
 exampleSite.station.timeIN = Column('timeIN', value=int(datetime.datetime(2019,8,28,14,0, 0).timestamp()), table=exampleSite.station)
 exampleSite.station.timeOUT = Column('timeOUT', value=int(datetime.datetime(2021,8,16,9,18,15).timestamp()), table=exampleSite.station)
@@ -112,11 +112,11 @@ exampleSite.ip.timestamp = Column('timestamp', value=int(datetime.datetime.now()
 #Create and populate camera table
 exampleSite.camera = Table('camera', 'coastcamdb', site=exampleSite, connection=exampleSite.connection)
 exampleSite.camera.id = idColumn(value='example', table=exampleSite.camera)
-exampleSite.camera.stationID = fkColumn('stationID', value=exampleSite.station.id.value_list[0], table=exampleSite.camera)
-exampleSite.camera.modelID = fkColumn('modelID', value=exampleSite.cameramodel.id.value_list[0], table=exampleSite.camera)
+exampleSite.camera.stationID = fkColumn('stationID', value=exampleSite.station.id.valueList[0], table=exampleSite.camera)
+exampleSite.camera.modelID = fkColumn('modelID', value=exampleSite.cameramodel.id.valueList[0], table=exampleSite.camera)
 exampleSite.camera.syncsToID = Column('syncsToID', value='none', table=exampleSite.camera)
-exampleSite.camera.lensmodelID = fkColumn('lensmodelID', value=exampleSite.lensmodel.id.value_list[0], table=exampleSite.camera)
-exampleSite.camera.li_IP = fkColumn('li_IP', value=exampleSite.ip.id.value_list[0], table=exampleSite.camera)
+exampleSite.camera.lensmodelID = fkColumn('lensmodelID', value=exampleSite.lensmodel.id.valueList[0], table=exampleSite.camera)
+exampleSite.camera.li_IP = fkColumn('li_IP', value=exampleSite.ip.id.valueList[0], table=exampleSite.camera)
 exampleSite.camera.lensSN = Column('lensSN', value='12345', table=exampleSite.camera)
 exampleSite.camera.cameraSN = Column('cameraSN', value='12345', table=exampleSite.camera)
 exampleSite.camera.filters = Column('filters', value='fisheye', table=exampleSite.camera)
@@ -135,7 +135,7 @@ exampleSite.camera.timestamp = Column('timestamp', value=int(datetime.datetime.n
 
 #create and populate geometry table
 exampleSite.geometry = Table('geometry', 'coastcamdb', site=exampleSite, connection=exampleSite.connection)
-exampleSite.geometry.cameraID = fkColumn('cameraID', value=exampleSite.camera.id.value_list[0], table=exampleSite.geometry)
+exampleSite.geometry.cameraID = fkColumn('cameraID', value=exampleSite.camera.id.valueList[0], table=exampleSite.geometry)
 exampleSite.geometry.m = Column('m', value=np.array([210.2936, -765.3697, -194.0322, 809.1383, 0.2564, -0.0394, -0.1578, -101.2408, 17.5729, -786.8411, 7.2383e+3]), table=exampleSite.geometry)
 exampleSite.geometry.azimuth = Column('azimuth', value=1.0, table=exampleSite.geometry)
 exampleSite.geometry.tilt = Column('tilt', value=2.0, table=exampleSite.geometry)
@@ -157,7 +157,7 @@ exampleSite.geometry.timestamp = Column('timestamp', value=int(datetime.datetime
 exampleSite.gcp = Table('gcp', 'coastcamdb', site=exampleSite, connection=exampleSite.connection)
 exampleSite.gcp.id = idColumn(value='YXXXY', table=exampleSite.gcp)
 exampleSite.gcp.name = Column('name', value='example gcp', table=exampleSite.gcp)
-exampleSite.gcp.siteID = fkColumn('siteID', value=exampleSite.site.id.value_list[0], table=exampleSite.gcp)
+exampleSite.gcp.siteID = fkColumn('siteID', value=exampleSite.site.id.valueList[0], table=exampleSite.gcp)
 exampleSite.gcp.x = Column('x', value=1.0, table=exampleSite.gcp)
 exampleSite.gcp.y = Column('y', value=2.0, table=exampleSite.gcp)
 exampleSite.gcp.z = Column('z', value=3.0, table=exampleSite.gcp)
@@ -167,7 +167,7 @@ exampleSite.gcp.timestamp = Column('timestamp', value=int(datetime.datetime.now(
 
 #create and populate a single usedgcp table
 exampleSite.usedgcp = Table('usedgcp', 'coastcamdb', site=exampleSite, connection=exampleSite.connection)
-exampleSite.usedgcp.gcpID = fkColumn('gcpID', value=exampleSite.gcp.id.value_list[0], table=exampleSite.usedgcp)
+exampleSite.usedgcp.gcpID = fkColumn('gcpID', value=exampleSite.gcp.id.valueList[0], table=exampleSite.usedgcp)
 exampleSite.usedgcp.geometrySequence = fkColumn('geometrySequence', value=2, table=exampleSite.usedgcp) #seq is created automatically by MySQL
 exampleSite.usedgcp.U = Column('U', value=-1.0, table=exampleSite.usedgcp)
 exampleSite.usedgcp.V = Column('V', value=-2.0, table=exampleSite.usedgcp)
