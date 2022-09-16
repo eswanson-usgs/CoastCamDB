@@ -14,7 +14,7 @@ isTable = False
 isSite = True
 
 # vv changeable parameter
-csv_path = "C:/Users/eswanson/OneDrive - DOI/Documents/GitHub/CoastCamDB/non_CLI/saved_csv/"
+csvPath = "C:/Users/eswanson/OneDrive - DOI/Documents/GitHub/CoastCamDB/non_CLI/saved_csv/"
 
 #column
 if isColumn:
@@ -23,7 +23,7 @@ if isColumn:
     table = 'camera'
     column = 'filters'
 
-    dataframe = column2csv(column, table, csv_path, connection)
+    dataframe = column2csv(column, table, csvPath, connection)
 
 #table
 if isTable:
@@ -31,7 +31,7 @@ if isTable:
     # vv changeable parameter vv
     table = 'camera'
 
-    dataframe = table2csv(table, csv_path, connection)
+    dataframe = table2csv(table, csvPath, connection)
 
 #site
 if isSite:
@@ -39,4 +39,4 @@ if isSite:
     # vv chnageable parameter vv
     siteID = '7654321'
 
-    dataframe_list = site2csv('7654321', csv_path, connection)
+    dataframeList = site2csv('7654321', csvPath, connection)
