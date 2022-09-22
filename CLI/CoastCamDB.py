@@ -5,8 +5,8 @@ for rectifying imagery.
 '''
 
 ##### IMPORTS #####
-from coastcamDBfuncs_CLI import *
-from coastcamDB_yaml_funcs_CLI import *
+from coastcamDBfuncsCLI import *
+from coastcamDBYAMLFuncsCLI import *
 
 
 ##### MAIN #####
