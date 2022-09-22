@@ -31,13 +31,13 @@ if __name__ == "__main__":
     runLoop = True
     while runLoop:
 
-        user_choice = input("\n~~~Enter 'read' or 'yaml': ")
+        userChoice = input("\n~~~Enter 'read' or 'yaml': ")
 
         isGoodAnswer = False
         while not isGoodAnswer:
 
             ### READ ###
-            if user_choice.strip() == 'read':
+            if userChoice.strip() == 'read':
 
                 isGoodAnswer = True
 
@@ -49,12 +49,12 @@ if __name__ == "__main__":
                 isValidChoice = False
                 while not isValidChoice:
 
-                    read_choice = input("~~~Enter 'site', 'table', or 'column': ")
-                    if read_choice.strip() == 'quit':
+                    readChoice = input("~~~Enter 'site', 'table', or 'column': ")
+                    if readChoice.strip() == 'quit':
                         runLoop = False
                         quit()
 
-                    elif read_choice.strip() == 'site':
+                    elif readChoice.strip() == 'site':
 
                         isValidChoice = True
 
@@ -63,9 +63,9 @@ if __name__ == "__main__":
                         print("vv Sites available to display are listed below vv")
                         print(result)
 
-                        avail_sites = []
+                        availSites = []
                         for ID in result.get('id'):
-                            avail_sites.append(ID)
+                            availSites.append(ID)
 
                         print("\nSelect data for a site from the database by entering a site id from the list above")
 
@@ -81,14 +81,14 @@ if __name__ == "__main__":
                                     runLoop = False
                                     quit()
                                     
-                                if siteID.strip() in avail_sites:
+                                if siteID.strip() in availSites:
                                     isGoodSite = True
                                 else:
                                     print('Invalid site id, please try again.\n')
 
                             print("\nNow displaying tables associated with site id '{}'".format(siteID))
                             #returns list of table dataframes to be used when storing the read data
-                            df_list = displaySite(siteID, connection)
+                            dfList = displaySite(siteID, connection)
 
                             print("\nStore read data in a csv?")
                             isYesNo = False
@@ -111,22 +111,22 @@ if __name__ == "__main__":
                                     
                             if storeCSV:
                                 print("\nPlease enter the filepath to the folder where you'd like to store the csv: ")
-                                csv_path = input("~~~Enter a filepath: ")
+                                csvPath = input("~~~Enter a filepath: ")
 
-                                data_dict = {}
-                                for df_tuple in df_list:
-                                    table = df_tuple[0]
-                                    df = df_tuple[1]
-                                    data_dict = store_read_data(df, 'site', table=table, csv_path=csv_path, data_dict=data_dict)
+                                dataDict = {}
+                                for dfTuple in dfList:
+                                    table = dfTuple[0]
+                                    df = dfTuple[1]
+                                    dataDict = storeReadData(df, 'site', table=table, csvPath=csvPath, dataDict=dataDict)
 
-                                site_path = csv_path + 'sites/' + siteID
-                                print("Saved csv to", site_path)
+                                sitePath = csvPath + 'sites/' + siteID
+                                print("Saved csv to", sitePath)
                             else:
-                                data_dict = {}
-                                for df_tuple in df_list:
-                                    table = df_tuple[0]
-                                    df = df_tuple[1]
-                                    data_dict = store_read_data(df, 'site', table=table, data_dict=data_dict)
+                                dataDict = {}
+                                for dfTuple in dfList:
+                                    table = dfTuple[0]
+                                    df = dfTuple[1]
+                                    dataDict = storeReadData(df, 'site', table=table, dataDict=dataDict)
 
                             print("\nRead data for another site?")
 
@@ -148,7 +148,7 @@ if __name__ == "__main__":
                                 else:
                                     print("Invalid choice. Please enter 'yes' or 'no'") 
 
-                    elif read_choice.strip() == 'table':
+                    elif readChoice.strip() == 'table':
 
                         isValidChoice = True
 
@@ -167,20 +167,20 @@ if __name__ == "__main__":
                             isGoodTable = False
                             while not isGoodTable:
 
-                                table_name = input("\n~~~Enter a table name: ")
-                                if table_name.strip() == 'quit':
+                                tableName = input("\n~~~Enter a table name: ")
+                                if tableName.strip() == 'quit':
                                     runLoop = False
                                     quit()
                                 
-                                if table_name.strip() in validTables:
+                                if tableName.strip() in validTables:
                                     isGoodTable = True
                                 else:
                                     print('Invalid table name, please try again.')
 
-                            print("Now displaying table '{}'\n".format(table_name))
-                            print("---" + table_name.upper() + "---")
+                            print("Now displaying table '{}'\n".format(tableName))
+                            print("---" + tableName.upper() + "---")
 
-                            query = "SELECT * FROM {}".format(table_name)
+                            query = "SELECT * FROM {}".format(tableName)
                             result = pd.read_sql(query, con=connection)
                             blankIndex = [''] * len(result)
                             result.index = blankIndex
@@ -207,10 +207,10 @@ if __name__ == "__main__":
                                     
                             if storeCSV:
                                 print("\nPlease enter the filepath to the folder where you'd like to store the csv: ")
-                                csv_path = input("~~~Enter a filepath: ")
-                                data_dict = store_read_data(result, 'table', csv_path=csv_path, table=table_name)
+                                csvPath = input("~~~Enter a filepath: ")
+                                dataDict = storeReadData(result, 'table', csvPath=csvPath, table=tableName)
                             else:
-                                data_dict = store_read_data(result, 'table', table=table_name)
+                                dataDict = storeReadData(result, 'table', table=tableName)
 
                             print("\nRead data for another table?")
 
@@ -232,7 +232,7 @@ if __name__ == "__main__":
                                 else:
                                     print("Invalid choice. Please enter 'yes' or 'no'") 
 
-                    elif read_choice.strip() == 'column':
+                    elif readChoice.strip() == 'column':
 
                         isValidChoice = True
 
@@ -248,17 +248,17 @@ if __name__ == "__main__":
                             isGoodTable = False
                             while not isGoodTable:
 
-                                table_name = input("\n~~~Enter a table name: ")
-                                if table_name.strip() == 'quit':
+                                tableName = input("\n~~~Enter a table name: ")
+                                if tableName.strip() == 'quit':
                                     runLoop = False
                                     quit()
                                 
-                                if table_name.strip() in validTables:
+                                if tableName.strip() in validTables:
                                     isGoodTable = True
                                 else:
                                     print('Invalid table name, please try again.')
 
-                            query = "SELECT * FROM {}".format(table_name)
+                            query = "SELECT * FROM {}".format(tableName)
                             result = pd.read_sql(query, con=connection)
 
                             validColumns = []
@@ -272,22 +272,22 @@ if __name__ == "__main__":
                             isGoodColumn = False
                             while not isGoodColumn:
 
-                                column_name = input("\n~~~Enter a column name: ")
-                                if column_name.strip() == 'quit':
+                                columnName = input("\n~~~Enter a column name: ")
+                                if columnName.strip() == 'quit':
                                     runLoop = False
                                     quit()
                                 
-                                if column_name.strip() in validColumns:
+                                if columnName.strip() in validColumns:
                                     isGoodColumn = True
                                 else:
                                     print('Invalid column name, please try again.')
 
-                            query = "SELECT {} FROM {}".format(column_name, table_name)
+                            query = "SELECT {} FROM {}".format(columnName, tableName)
                             result = pd.read_sql(query, con=connection)
                             blankIndex = [''] * len(result)
                             result.index = blankIndex
-                            print("---" + column_name + "---")
-                            for row in result.get(column_name):
+                            print("---" + columnName + "---")
+                            for row in result.get(columnName):
                                 print(row)
 
                             print("\nStore read data in a csv?")
@@ -311,10 +311,10 @@ if __name__ == "__main__":
                                     
                             if storeCSV:
                                 print("\nPlease enter the filepath to the folder where you'd like to store the csv: ")
-                                csv_path = input("~~~Enter a filepath: ")
-                                data_dict = store_read_data(result, 'column', csv_path=csv_path, table=table_name)
+                                csvPath = input("~~~Enter a filepath: ")
+                                dataDict = storeReadData(result, 'column', csvPath=csvPath, table=tableName)
                             else:
-                                data_dict = store_read_data(result, 'column')
+                                dataDict = storeReadData(result, 'column')
                             
                             print("\nRead data for another column?")
 
@@ -341,11 +341,20 @@ if __name__ == "__main__":
 
     
             ### YAML ###
-            elif user_choice.strip() == 'yaml':
+            elif userChoice.strip() == 'yaml':
 
                 isGoodAnswer = True
 
                 print('\nPlease specify the CoastCam station ID to create YAML files for and path to save files')
+
+                query = "SELECT id, shortName FROM station"
+                result = pd.read_sql(query, con=connection)
+                print("vv Available station IDs are listed below vv")
+                print(result)
+
+                availStationID = []
+                for ID in result.get('id'):
+                    availStationID.append(ID)
 
                 #get station id and verify it is in table
                 isValidID = False
@@ -357,7 +366,7 @@ if __name__ == "__main__":
 
                     try:
                         #check that station id exists in database. If check fails, exception is returned. Otherwise, None is retruned
-                        check = check_id(stationID, 'station', connection)
+                        check = checkID(stationID, 'station', connection)
                         if check != None:
                             raise Exception
                         
@@ -370,26 +379,26 @@ if __name__ == "__main__":
                 #get output path
                 isValidPath = False
                 while not isValidPath:
-                    yaml_path = input("~~~Enter path to save YAMl files to (ex: ./yaml_files) : ")
-                    if yaml_path.strip() == 'quit':
+                    yamlPath = input("~~~Enter path to save YAMl files to (ex: ./yaml_files) : ")
+                    if yamlPath.strip() == 'quit':
                         runLoop = False
                         quit()
 
                     try:
-                        createYAMLfiles(stationID, yaml_path, connection)
+                        createYAMLfiles(stationID, yamlPath, connection)
                         isValidPath = True
 
                     except:
                         print("Invalid path, could not write YAML files. Please try again.")
                
                 
-            elif user_choice.strip() == 'quit':
+            elif userChoice.strip() == 'quit':
                 runLoop = False
                 quit()
 
             else:
 
-                user_choice = input("~~~Please enter 'read' or 'yaml': ")
+                userChoice = input("~~~Please enter 'read' or 'yaml': ")
 
             
 

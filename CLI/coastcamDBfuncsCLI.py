@@ -529,8 +529,6 @@ def getParameterDicts(stationID, connection, useUnix=False, unixTime=None):
     else:
         query = "SELECT * FROM camera WHERE stationID = '{}'".format(stationID)
 
-    print(query)
-
     result = pd.read_sql(query, con=connection)
     cameraList = []
     for ID in result.get('id'):
@@ -802,7 +800,7 @@ def storeReadData(dataframe, scope, table, csvPath='', dataDict = {}):
             print("Saved csv file to", fullPath)
     
     elif scope == 'site':
-        nested_dict = {}
+        nestedDict = {}
         columnList = dataframe.columns
         
         for column in columnList:
@@ -811,8 +809,8 @@ def storeReadData(dataframe, scope, table, csvPath='', dataDict = {}):
             for value in dataframe.get(column):
                 columnValues.append(value)
 
-            nested_dict[column] = columnValues
-        dataDict[table] = nested_dict
+            nestedDict[column] = columnValues
+        dataDict[table] = nestedDict
 
         if csvPath != '':
             site = dataDict['site']['id'][0]
@@ -824,6 +822,8 @@ def storeReadData(dataframe, scope, table, csvPath='', dataDict = {}):
 
             fullPath = folderPath + filename
             dataframe.to_csv(fullPath, encoding='utf-8', index=False)
+
+        return dataDict
     
     else:
         print("'scope' argument for storeReadData() must be 'column', 'table', or 'site'")
