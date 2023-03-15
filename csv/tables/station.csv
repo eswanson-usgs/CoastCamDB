@@ -1,5 +1,0 @@
-seq,id,shortName,name,siteID,timeIN,timeOUT,timestamp,stationid
-27,,,bingbong,7654321,0,0,,
-24,7654321,examplexx,example site station,7654321,1567015200,1629119895,1657652756.0,EXSTATX
-25,elpmaxx,another1,,7654321,0,0,,
-26,xtestx,,,7654321,0,0,,

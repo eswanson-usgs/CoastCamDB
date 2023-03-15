@@ -1,3 +1,0 @@
-seq,tilt,azimuth,fov,roll,imagePath,whenDone,whenValid,err,version,solvedVars,user,tiltCI,azimuthCI,rollCI,m,timestamp,cameraID
-16,,,,,,0,0,,,,,,,,,,1234567
-15,2.0,1.0,10.0,3.0,/home/images/example.jpg,1660160038,1660160038,0.05,1.2,tarfxyz,John Doe,0.5,0.5,0.5,"[ 2.1029e+02 -7.6537e+02 -1.9403e+02  8.0914e+02  2.5640e-01 -3.9400e-02, -1.5780e-01 -1.0124e+02  1.7573e+01 -7.8684e+02  7.2383e+03]",1660160038,example

@@ -1,0 +1,22 @@
+NU: 2448
+NV: 2048
+fx: 3722.49271076636
+fy: 3724.23959575309
+c0U: 1377.37609148303
+c0V: 1077.76336550548
+d1: -0.222347133817209
+d2: 0.79907175214222
+d3: -3.07114534173783
+t1: 0.00251827008335466
+t2: 0.00426709440522072
+#NU - number of pixel columns
+#NV - number of pixel rows
+#fx - x component of the focal length (pixels)
+#fy - y component of the focal length (pixels)
+#c0U - first component of the principal point
+#c0V - second component of the principal point
+#d1 - first radial distortion coefficient
+#d2 - second radial distortion coefficient
+#d3 - third radial distortion coefficient
+#t1 - first tangential distortion coefficient
+#t2 - second tangential distortion coefficient
