@@ -1080,6 +1080,9 @@ def csv2db(csvPath, connection):
             elif i == 1:
                 columnValues = row
 
+    #get rid of more weird formatting from UTF-8 encoding            
+    columnNames[0] = columnNames[0].replace('\ufeff', '')  
+
     validTables = ['site', 'station', 'gcp', 'camera', 'cameramodel', 'lensmodel' , 'ip', 'geometry', 'usedgcp']
     fkColumnList = ['siteID', 'stationID', 'modelID', 'lensmodelID', 'li_IP', 'cameraID', 'siteID', 'gcpID', 'geometrySequence']
 
