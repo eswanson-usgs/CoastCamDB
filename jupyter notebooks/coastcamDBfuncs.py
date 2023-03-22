@@ -1068,20 +1068,28 @@ def csv2db(csvPath, connection):
         none
     '''
 
+    #list for csv files with more than 1 row values. Each row is an index in columnValues
+    columnValues = []
     with open(csvPath, 'r') as csvFile:
         csvreader = csv.reader(csvFile)
 
         for i, row in enumerate(csvreader):
             #get rid of weird formatting from UTF-8 encoding
             row[0] = row[0].replace('ï»¿', '')
+            row[0] = row[0].replace('\ufeff', '')  
 
             if i == 0:
                 columnNames = row
-            elif i == 1:
-                columnValues = row
-
-    #get rid of more weird formatting from UTF-8 encoding            
-    columnNames[0] = columnNames[0].replace('\ufeff', '')  
+            else:
+                columnValues.append(row)   
+    
+    #remove any blank column headers and the associated values in each row
+    while '' in columnNames:
+        for i, column in enumerate(columnNames):
+            if column == '':
+                columnNames.pop(i)
+                for row in columnValues:
+                    row.pop(i)       
 
     validTables = ['site', 'station', 'gcp', 'camera', 'cameramodel', 'lensmodel' , 'ip', 'geometry', 'usedgcp']
     fkColumnList = ['siteID', 'stationID', 'modelID', 'lensmodelID', 'li_IP', 'cameraID', 'siteID', 'gcpID', 'geometrySequence']
@@ -1097,20 +1105,21 @@ def csv2db(csvPath, connection):
     except:
         print('Not a valid table name in the filename')
         return
-
+    
     table = Table(tableName, 'coastcamdb', connection)
-    for i, column in enumerate(columnNames):
+    for j, row in enumerate(columnValues):
+        for i, column in enumerate(columnNames):
 
-        if column in fkColumnList:
-            table.__dict__[column] = fkColumn(columnName=column, table=table, value=columnValues[i])
+                if (column == 'id'):
+                    table.__dict__[column] = idColumn(table=table, value=columnValues[j][i])
 
-        elif column == 'id':
-            table.__dict__[column] = idColumn(table=table, value=columnValues[i])
+                elif column in fkColumnList:
+                    table.__dict__[column] = fkColumn(columnName=column, table=table, value=columnValues[j][i])
 
-        else:
-            table.__dict__[column] = Column(columnName=column, table=table, value=columnValues[i])
+                else:
+                    table.__dict__[column] = Column(columnName=column, table=table, value=columnValues[j][i])
 
-    table.insertTable2db()
+        table.insertTable2db()
 
 
             
@@ -1336,7 +1345,7 @@ class Table:
                     #special case: check that geometrySequence matches a seq value in geometry table. If not, set geometrySequence to most recently inserted seq value in geometry.
                     #this is because seq auto increments for each new insertion in geometry
                     if fkColumns[i].columnName == 'geometrySequence':
-
+                        
                         query = "SELECT seq FROM geometry WHERE seq = {}".format(fkColumns[i].valueList[j])
                         result = pd.read_sql(query, con=self.connection)
                         if result.size == 0:
@@ -1402,7 +1411,7 @@ class Table:
 
             if self.tableName == 'camera':
                 
-                query = "INSERT INTO camera (stationID, li_IP, lensmodelID, modelID) VALUES ('{}', '{}', '{}', '{}')".format(multiFkDict['stationID'][j], multiFkDict['modelID'][j], multiFkDict['lensmodelID'][j], multiFkDict['li_IP'][j]) 
+                query = "INSERT INTO camera (stationID, modelID, lensmodelID, li_IP) VALUES ('{}', '{}', '{}', '{}')".format(multiFkDict['stationID'][j], multiFkDict['modelID'][j], multiFkDict['lensmodelID'][j], multiFkDict['li_IP'][j]) 
 
             if self.tableName == 'usedgcp':
 
